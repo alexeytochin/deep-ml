@@ -1,0 +1,5 @@
+resolver: lts-20.18
+
+packages:
+  - inf-backprop
+  - simple-expr
