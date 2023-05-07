@@ -349,7 +349,7 @@ We will need the imports below.
 
 >>> import Prelude (Integer, Float, ($), (+), (*))
 >>> import Control.Monad.Logger (runStdoutLoggingT, MonadLogger)
->>> import Control.Arrow ((>>>), (***), runKleisli, Kleisli)
+>>> import Control.Arrow ((>>>), runKleisli, Kleisli)
 >>> import InfBackprop (derivative, loggingBackpropExpr)
 >>> import Debug.SimpleExpr.Expr (variable)
 >>> import Debug.LoggingBackprop (initUnaryFunc, initBinaryFunc, pureKleisli, exp, sin)
