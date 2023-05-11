@@ -1,0 +1,73 @@
+name:                inf-backprop
+version:             0.1.0.0
+license:             BSD3
+author:              "Alexey Tochin"
+maintainer:          "Alexey.Tochin@gmail.com"
+copyright:           "2023 Alexey Tochin"
+
+extra-source-files:
+  - CHANGELOG.md
+
+synopsis:            Automatic differentiation and backpropagation.
+category:            Math
+
+description: |
+  ![Second order derivative of a composition](doc/images/composition_second_derivative.png)
+
+  Automatic differentiation and backpropagation.
+  We do not attract gradient tape.
+  Instead, the differentiation operator is defined directly as a map between differentiable function objects.
+  Such functions are to be combined in arrow style using '(>>>)', '(***)', 'first', etc.
+  
+  The original purpose of the package is an automatic backpropagation differentiation component
+  for a functional type-dependent library for deep machine learning.
+  See [tutorial](InfBackprop-Tutorial.html) details.
+  
+dependencies:
+  - base >= 4.7 && < 5
+  - numhask
+  - isomorphism-class
+  - monad-logger
+  - text
+  - transformers
+  - comonad
+  - simple-expr
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wpartial-fields
+  - -Wredundant-constraints
+
+library:
+  source-dirs: src
+  default-extensions:
+    - NoImplicitPrelude
+    - GADTs
+    - TypeFamilies
+    - MultiParamTypeClasses
+    - FlexibleInstances
+    - ScopedTypeVariables
+    - ConstraintKinds
+    - RankNTypes
+    - InstanceSigs
+    - TupleSections
+    - FlexibleContexts
+    - DeriveFunctor
+
+tests:
+  doctests:
+    source-dirs:        doctests
+    main:               Main.hs
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - simple-expr
+      - doctest

@@ -1,0 +1,77 @@
+name:                simple-expr
+version:             0.1.0.0
+license:             BSD3
+author:              "Alexey Tochin"
+maintainer:          "Alexey.Tochin@gmail.com"
+copyright:           "2023 Alexey Tochin"
+
+extra-source-files:
+  - CHANGELOG.md
+
+synopsis:            Minimalistic toolkit for simple mathematical expression.
+category:            Math
+
+description: |
+  This is a minimalistic toolkit for simple mathematical expression developed for debug purposes similar to
+  'simple-reflect' package
+  but based on slightly different principles.
+  In particular, we use ordinary syntactic trees instead of turning them into strings.
+  There is a primitive manipulation capability like
+
+  @
+    >>> simplify $ (x + 0) * 1 - x * (3 - 2)
+    0
+  @
+
+  Besides an expression visualization feature is supported.
+
+  ![image description](doc/images/imaginary_expr_sum.png)
+  
+  See [tutorial](Debug-SimpleExpr-Tutorial.html) for details.
+
+dependencies:
+  - base >= 4.7 && < 5
+  - text
+  - numhask
+  - graphviz
+  - graphite
+  - hashable
+  - unicode-show
+  - data-fix
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wpartial-fields
+  - -Wredundant-constraints
+
+library:
+  source-dirs: src
+  default-extensions:
+    - NoImplicitPrelude
+    - InstanceSigs
+    - DeriveFunctor
+    - MultiParamTypeClasses
+    - FlexibleInstances
+    - RankNTypes
+    - FlexibleContexts
+    - ScopedTypeVariables
+    - ConstraintKinds
+
+tests:
+  doctests:
+    source-dirs:        doctests
+    main:               Main.hs
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - simple-expr
+      - doctest
+
