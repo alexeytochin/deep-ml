@@ -77,7 +77,7 @@ module InfBackprop
   )
 where
 
-import Data.CatBifunctor (first, second, (***))
+import Control.CatBifunctor (first, second, (***))
 import Debug.LoggingBackprop (backpropExpr, loggingBackpropExpr, pureKleisli)
 import InfBackprop.Common
   ( Backprop (MkBackprop),

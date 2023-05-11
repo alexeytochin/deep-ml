@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module    :  Data.CatBifunctor
+-- | Module    :  Control.CatBifunctor
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
 --
 -- Categorical Bifunctor typeclass and its trivial instances.
-module Data.CatBifunctor
+module Control.CatBifunctor
   ( CatBiFunctor,
     first,
     second,

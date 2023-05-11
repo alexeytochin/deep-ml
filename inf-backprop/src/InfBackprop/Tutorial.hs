@@ -33,6 +33,7 @@ where
 
 import Control.Arrow (Kleisli, (<<<), (>>>))
 import Control.Monad.Logger (MonadLogger)
+import Debug.SimpleExpr (SimpleExpr, simplify)
 import InfBackprop
   ( Backprop,
     BackpropFunc,
@@ -40,11 +41,13 @@ import InfBackprop
     call,
     cos,
     derivative,
+    exp,
     first,
     forward,
     pow,
     pureBackprop,
     second,
+    (*),
     (***),
   )
 import Prelude (Maybe (Just, Nothing), Monad)
@@ -116,7 +119,7 @@ import Prelude (Maybe (Just, Nothing), Monad)
 -- we use arrow notations '(***)', 'first' and 'second' as follows
 --
 -- >>> import InfBackprop ((+), dup)
--- >>> import Data.CatBifunctor ((***))
+-- >>> import Control.CatBifunctor ((***))
 --
 -- >>> smoothH = dup >>> (pow 2 *** pow 3) >>> (+) :: BackpropFunc Float Float
 --
@@ -217,7 +220,7 @@ import Prelude (Maybe (Just, Nothing), Monad)
 -- ![image description](doc/images/composition_derivative.png)
 --
 -- where
--- `simplify'@ :: @'SimpleExpr'@ -> @'SimpleExpr`
+-- 'simplify'@ :: @'SimpleExpr'@ -> @'SimpleExpr`
 -- is a simple removal such things like @*1@ and @+0@.
 --
 -- As well as the second derivative is straightforward

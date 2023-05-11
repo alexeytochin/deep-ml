@@ -33,9 +33,9 @@ module Debug.LoggingBackprop
 where
 
 import Control.Arrow (Kleisli (Kleisli))
+import Control.CatBifunctor (first, second, (***))
 import Control.Category ((.), (>>>))
 import Control.Monad.Logger (MonadLogger, logInfoN)
-import Data.CatBifunctor (first, second, (***))
 import Data.Text (pack)
 import Debug.SimpleExpr.Expr (SimpleExpr, unaryFunc)
 import InfBackprop.Common (Backprop (MkBackprop), BackpropFunc)

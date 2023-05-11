@@ -51,8 +51,8 @@ module Prelude.InfBackprop
   )
 where
 
+import Control.CatBifunctor (first, second, (***))
 import Control.Category ((<<<), (>>>))
-import Data.CatBifunctor (first, second, (***))
 import InfBackprop.Common (Backprop (MkBackprop), BackpropFunc, const)
 import IsomorphismClass.Isomorphism (iso)
 import NumHask (Additive, Distributive, Divisive, ExpField, Subtractive, TrigField, fromInteger, zero)

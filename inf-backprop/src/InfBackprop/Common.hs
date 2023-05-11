@@ -31,8 +31,8 @@ module InfBackprop.Common
 where
 
 import Control.Arrow (Kleisli (Kleisli))
+import Control.CatBifunctor (CatBiFunctor, first, (***))
 import Control.Category (Category, id, (.), (>>>))
-import Data.CatBifunctor (CatBiFunctor, first, (***))
 import GHC.Natural (Natural)
 import IsomorphismClass (IsomorphicTo)
 import IsomorphismClass.Extra ()
