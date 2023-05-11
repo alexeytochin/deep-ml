@@ -41,13 +41,11 @@ import InfBackprop
     call,
     cos,
     derivative,
-    exp,
     first,
     forward,
     pow,
     pureBackprop,
     second,
-    (*),
     (***),
   )
 import Prelude (Maybe (Just, Nothing), Monad)
@@ -309,10 +307,10 @@ import Prelude (Maybe (Just, Nothing), Monad)
 -- The 'backward' is
 -- @(dy, x) -> dy * (-cos x)@,
 -- where @dy@ is the derivative found on the previous backward step and the second value is @x@ stored by `forward`.
--- We simply multiply with '(*)' the derivative @dy@ on the derivative of @sin@ that is @-cos@.
+-- We simply multiply with @(*)@ the derivative @dy@ on the derivative of @sin@ that is @-cos@.
 --
 -- The stored value is not necessary just @x@. It could be anything useful for the backward step, see for example
--- the implementation for 'exp' and the corresponding
+-- the implementation for @exp@ and the corresponding
 -- [example](InfBackprop.Tutorial#differentiation_with_logging)
 -- below.
 
