@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module      :  Debug.SimpleExpr.Expr
+-- | Module    :  Prelude.InfBackprop
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
@@ -59,10 +59,10 @@ import NumHask (Additive, Distributive, Divisive, ExpField, Subtractive, TrigFie
 import qualified NumHask as NH
 import NumHask.Prelude (one)
 import qualified NumHask.Prelude as NHP
-import Prelude (flip, uncurry, (==), ($))
+import Prelude (flip, uncurry, ($), (==))
 import qualified Prelude as P
 
--- | Returns a differentiable morphism given forward function and backpropagation derivative differential morphism. 
+-- | Returns a differentiable morphism given forward function and backpropagation derivative differential morphism.
 --
 -- ==== __Examples of usage__
 --
@@ -73,10 +73,10 @@ simpleDifferentiable f df = MkBackprop call' forward' backward'
   where
     call' :: x -> x
     call' = f
-      
+
     forward' :: BackpropFunc x (x, x)
     forward' = dup >>> first (simpleDifferentiable f df)
-    
+
     backward' :: BackpropFunc (x, x) x
     backward' = second df >>> (*)
 
@@ -503,13 +503,14 @@ sqrt = MkBackprop call' forward' backward'
       where
         -- (x^n, (n, x)) -> n * x^(n-1)
         dn :: BackpropFunc (a, (a, a)) a
-        dn = forgetFirst -- (n, x)
+        dn =
+          forgetFirst -- (n, x)
             >>> first dup -- ((n, n), x)
             >>> (iso :: BackpropFunc ((a, b), c) (a, (b, c))) -- (n, (n, x))
             >>> second (first (setSecond (NH.fromIntegral (1 :: P.Integer)) (-))) -- (n, (n-1, x))
             >>> second (**) -- (n, x^(n-1))
             >>> (*) -- (n * x^(n-1))
-        -- (x^n, (n, x)) -> log x * x^n
+            -- (x^n, (n, x)) -> log x * x^n
         dx :: BackpropFunc (a, (a, a)) a
         dx = second forgetFirst >>> second log >>> (*)
 

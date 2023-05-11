@@ -1,12 +1,12 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module    :  Debug.SimpleExpr.Expr
+-- | Module    :  InfBackprop
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
 --
 -- Automatic differentiation and backpropagation.
--- See 'InfBackprop.Tutorial.Basics' for details.
+-- See 'InfBackprop.Tutorial' for details.
 module InfBackprop
   ( -- * Base
 

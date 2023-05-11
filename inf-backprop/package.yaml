@@ -21,7 +21,7 @@ description: |
   
   The original purpose of the package is an automatic backpropagation differentiation component
   for a functional type dependent deep machine learning library.
-  See [tutorial](Tutorial-Basics.html) details.
+  See [tutorial](InfBackprop-Tutorial.html) details.
   
 dependencies:
   - base >= 4.7 && < 5

@@ -7,7 +7,6 @@
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
 --
 -- Simple expressions base types and manipulations.
-
 module Debug.SimpleExpr.Expr
   ( -- * Expression manipulation
     number,
@@ -33,7 +32,7 @@ where
 import Control.Monad.Fix (fix)
 import Data.Fix (Fix (Fix, unFix))
 import Data.Functor.Classes (Eq1, liftEq)
-import Data.List (intercalate)
+import Data.List (intercalate, (++))
 import NumHask (Additive, Distributive, Divisive, ExpField, Field, Multiplicative, Subtractive, TrigField, one, zero)
 import qualified NumHask as NH
 import Prelude
@@ -45,7 +44,6 @@ import Prelude
     Show,
     String,
     fmap,
-    id,
     seq,
     show,
     ($),
@@ -149,20 +147,26 @@ instance ListOf inner () where
 instance ListOf inner inner where
   content e = [e]
 
-instance ListOf inner (inner, inner) where
-  content (e0, e1) = [e0, e1]
+instance (ListOf inner outer1, ListOf inner outer2) => ListOf inner (outer1, outer2) where
+  content (x1, x2) = content x1 ++ content x2
 
-instance ListOf inner (inner, inner, inner) where
-  content (e0, e1, e2) = [e0, e1, e2]
+instance (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3) => ListOf inner (outer1, outer2, outer3) where
+  content (x1, x2, x3) = content x1 ++ content x2 ++ content x3
 
-instance ListOf inner (inner, inner, inner, inner) where
-  content (e0, e1, e2, e3) = [e0, e1, e2, e3]
+instance
+  (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3, ListOf inner outer4) =>
+  ListOf inner (outer1, outer2, outer3, outer4)
+  where
+  content (x1, x2, x3, x4) = content x1 ++ content x2 ++ content x3 ++ content x4
 
-instance ListOf inner (inner, inner, inner, inner, inner) where
-  content (e0, e1, e2, e3, e4) = [e0, e1, e2, e3, e4]
+instance
+  (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3, ListOf inner outer4, ListOf inner outer5) =>
+  ListOf inner (outer1, outer2, outer3, outer4, outer5)
+  where
+  content (x1, x2, x3, x4, x5) = content x1 ++ content x2 ++ content x3 ++ content x4 ++ content x5
 
-instance ListOf inner [inner] where
-  content = id
+instance (ListOf inner outer) => ListOf inner [outer] where
+  content = (content P.=<<)
 
 -- | Expression typeclass.
 -- It includes `SimpleExpr` as well as list and tuples of `SimpleExpr` etc.

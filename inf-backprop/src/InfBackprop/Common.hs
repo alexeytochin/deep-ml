@@ -1,7 +1,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module    :  Debug.SimpleExpr.Expr
+-- | Module    :  InfBackprop.Common
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
@@ -97,7 +97,7 @@ data Backprop cat input output = forall cache.
   MkBackprop
   { -- | Simple internal category object extraction.
     call :: cat input output,
-    -- | Returns forward category. 
+    -- | Returns forward category.
     -- In the case @cat = (->)@, the method coincides with 'Backprop'@ cat input output@ itself
     -- but the output contains an additional data term @cache@ with some calculation result that can be reused on in
     -- 'backward'.
@@ -199,7 +199,7 @@ forwardBackward dy (MkBackprop _ forward_ backward_) = forward_ >>> first dy >>>
 -- Calculating Jacobians is not currently implemented.
 class Distributive x => StartBackprop cat x where
   -- | Morphism that connects forward and backward chain.
-  -- Usually it is just @1@ that is supposed to be multiplied on the derivative of the top function.  
+  -- Usually it is just @1@ that is supposed to be multiplied on the derivative of the top function.
   startBackprop :: Backprop cat x x
 
 -- | Backpropagation derivative in terms of backprop morphisms.

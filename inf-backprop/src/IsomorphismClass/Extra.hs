@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module      :  Debug.SimpleExpr.Expr
+-- | Module    :  IsomorphismClass.Extra
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>

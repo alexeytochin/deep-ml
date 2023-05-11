@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module    :  Debug.SimpleExpr.Expr
+-- | Module    :  Data.CatBifunctor
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
@@ -50,7 +50,7 @@ import Prelude (Either (Left, Right), Monad, fmap, fst, snd, ($))
 --
 -- ==== __Comonad and type product instance examples of usage__
 --
--- >>> import Prelude (Int, pure, Maybe(Just, Nothing), const, replicate, String, (+), (++), Functor, Show, show, (==), (-))
+-- >>> import Prelude (Int, pure, Maybe(..), const, replicate, String, (+), (++), Functor, Show, show, (==), (-))
 -- >>> import Control.Comonad (Cokleisli(Cokleisli), runCokleisli, extract, duplicate, (=>=))
 -- >>> import Control.Comonad.Store (store, seek, runStore, Store, StoreT)
 -- >>> import Control.Category ((>>>))

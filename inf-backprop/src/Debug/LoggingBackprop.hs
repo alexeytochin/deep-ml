@@ -2,14 +2,14 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module    :  Debug.SimpleExpr.Expr
+-- | Module    :  Debug.LoggingBackprop
 -- Copyright   :  (C) 2023 Alexey Tochin
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
 --
 -- Basics for simple expressions equipped with Monadic behaviour.
 -- In particular, basic functions with logging for debug and illustration purposes.
--- See [this tutorial section](InfBackprop.Tutorial.Basics#differentiation_monadic_types) for details.
+-- See [this tutorial section](InfBackprop.Tutorial#differentiation_monadic_types) for details.
 module Debug.LoggingBackprop
   ( -- * Generic logging functions
     unitConst,
@@ -18,7 +18,7 @@ module Debug.LoggingBackprop
     pureKleisli,
     backpropExpr,
     loggingBackpropExpr,
-    
+
     -- * Logging functions examples
     const,
     linear,
@@ -95,7 +95,15 @@ initUnaryFunc msg f = Kleisli $ \a -> do
 initBinaryFunc :: (Show a, Show b, Show c, MonadLogger m) => String -> (a -> b -> c) -> Kleisli m (a, b) c
 initBinaryFunc msg f = Kleisli $ \(a, b) -> do
   let c = f a b
-  logInfoN $ "Calculating " <> pack msg <> " of " <> pack (show a) <> " and " <> pack (show b) <> " => " <> pack (show c)
+  logInfoN $
+    "Calculating "
+      <> pack msg
+      <> " of "
+      <> pack (show a)
+      <> " and "
+      <> pack (show b)
+      <> " => "
+      <> pack (show c)
   return c
 
 -- | Returns pure Kleisli morphism given a map.
@@ -176,7 +184,7 @@ loggingBackpropExpr funcName = MkBackprop call' forward' backward'
 -- >>> import Control.Monad.Logger (runStdoutLoggingT)
 -- >>> import Debug.SimpleExpr.Expr (variable)
 -- >>> import InfBackprop (call, derivative)
--- 
+--
 -- >>> runStdoutLoggingT $ runKleisli (call (const 42)) ()
 -- 42
 const ::
