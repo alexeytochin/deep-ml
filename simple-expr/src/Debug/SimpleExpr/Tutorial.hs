@@ -101,7 +101,7 @@ import Prelude (FilePath, IO, String)
 --
 -- @ plotExpr expr @
 --
--- ![image description](/home/alexey/Dropbox/projects/deep-ml/simple-expr/doc/images/composition.png)
+-- ![image description](doc/images/composition.png)
 --
 -- To save the image as a file use, for example,
 --
