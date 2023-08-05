@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wcpp-undef #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -33,7 +35,7 @@ import Control.Monad.Fix (fix)
 import Data.Fix (Fix (Fix, unFix))
 import Data.Functor.Classes (Eq1, liftEq)
 import Data.List (intercalate, (++))
-import NumHask (Additive, Distributive, Divisive, ExpField, Field, Multiplicative, Subtractive, TrigField, one, zero)
+import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero)
 import qualified NumHask as NH
 import Prelude
   ( Bool (False),
@@ -172,40 +174,6 @@ instance (ListOf inner outer) => ListOf inner [outer] where
 -- It includes `SimpleExpr` as well as list and tuples of `SimpleExpr` etc.
 type Expr = ListOf SimpleExpr
 
----- | Expression typeclass.
--- class Eq a => Expr a where
---  -- | Returns all simple expressions given expression consists of.
---  --
---  -- ==== __Examples of usage__
---  --
---  -- >>> import NumHask ((+), (*))
---  --
---  -- >>> x = variable "x"
---  -- >>> y = variable "y"
---  -- >>> z = variable "z"
---  --
---  -- >>> innerSimpleExprs [x, y + z]
---  -- [x,y+z]
---  --
---  -- >>> innerSimpleExprs (x * (y + z))
---  -- [x·(y+z)]
---  innerSimpleExprs :: a -> [SimpleExpr]
---
--- instance Expr () where
---  innerSimpleExprs = P.const []
---
--- instance Expr SimpleExpr where
---  innerSimpleExprs e = [e]
---
--- instance Expr (SimpleExpr, SimpleExpr) where
---  innerSimpleExprs (e0, e1) = [e0, e1]
---
--- instance Expr (SimpleExpr, SimpleExpr, SimpleExpr) where
---  innerSimpleExprs (e0, e1, e2) = [e0, e1, e2]
---
--- instance Expr [SimpleExpr] where
---  innerSimpleExprs = P.id
-
 instance {-# OVERLAPPING #-} Show SimpleExpr where
   show (Fix e) = case e of
     NumberF n -> show n
@@ -266,12 +234,18 @@ instance Multiplicative SimpleExpr where
   one = number 1
   (*) = binaryFunc "·"
 
-instance Distributive SimpleExpr
+#if MIN_VERSION_numhask(0,11,0)
+#else
+instance NH.Distributive SimpleExpr
+#endif
 
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
 
-instance Field SimpleExpr
+#if MIN_VERSION_numhask(0,11,0)
+#else
+instance NH.Field SimpleExpr
+#endif
 
 instance ExpField SimpleExpr where
   exp = unaryFunc "exp"
