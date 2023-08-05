@@ -60,8 +60,8 @@ appendNodeToGraph newNodeName depNodeNames graph = foldr addArc initGraph depNod
 -- >>> y = variable "y"
 -- >>> exprToGraph [x + y, x - y]
 -- ...
--- 
--- We expect something like 
+--
+-- We expect something like
 -- @fromList [("y",[("x-y",()),("x+y",())]),("x-y",[]),("x",[("x-y",()),("x+y",())]),("x+y",[])]@
 -- depending on the packages version version.
 exprToGraph :: Expr d => d -> DGraph String ()

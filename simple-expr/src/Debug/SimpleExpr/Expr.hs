@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wcpp-undef #-}
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wcpp-undef #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -35,7 +35,7 @@ import Control.Monad.Fix (fix)
 import Data.Fix (Fix (Fix, unFix))
 import Data.Functor.Classes (Eq1, liftEq)
 import Data.List (intercalate, (++))
-import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero, Distributive, Field)
+import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero)
 import qualified NumHask as NH
 import Prelude
   ( Bool (False),
@@ -234,17 +234,17 @@ instance Multiplicative SimpleExpr where
   one = number 1
   (*) = binaryFunc "·"
 
-#if MIN_VERSION_GLASGOW_HASKELL(9,6,2,0)
+#if MIN_VERSION_pkgname(0,11,0)
 #else
-instance Distributive SimpleExpr
+instance NH.Distributive SimpleExpr
 #endif
 
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
 
-#if MIN_VERSION_GLASGOW_HASKELL(9,6,2,0)
+#if MIN_VERSION_pkgname(0,11,0)
 #else
-instance Field SimpleExpr
+instance NH.Field SimpleExpr
 #endif
 
 instance ExpField SimpleExpr where
