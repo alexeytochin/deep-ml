@@ -234,7 +234,7 @@ instance Multiplicative SimpleExpr where
   one = number 1
   (*) = binaryFunc "·"
 
-#if MIN_VERSION_NUMHASK(0,11,0)
+#if MIN_VERSION_numhask(0,11,0)
 #else
 instance NH.Distributive SimpleExpr
 #endif
@@ -242,7 +242,7 @@ instance NH.Distributive SimpleExpr
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
 
-#if MIN_VERSION_NUMHASK(0,11,0)
+#if MIN_VERSION_numhask(0,11,0)
 #else
 instance NH.Field SimpleExpr
 #endif

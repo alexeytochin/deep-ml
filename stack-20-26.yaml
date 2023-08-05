@@ -1,4 +1,4 @@
-resolver: lts-20.26 # 9.2.8
+resolver: lts-20.26 # ghc 9.2.8
 
 packages:
   - inf-backprop
