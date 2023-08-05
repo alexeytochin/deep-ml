@@ -266,12 +266,12 @@ instance Multiplicative SimpleExpr where
   one = number 1
   (*) = binaryFunc "·"
 
-instance Distributive SimpleExpr
+--instance Distributive SimpleExpr
 
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
 
-instance Field SimpleExpr
+--instance Field SimpleExpr
 
 instance ExpField SimpleExpr where
   exp = unaryFunc "exp"
