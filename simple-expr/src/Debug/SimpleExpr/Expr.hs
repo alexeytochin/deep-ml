@@ -1,6 +1,7 @@
+{-# OPTIONS_GHC -Wcpp-undef #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 -- | Module    :  Debug.SimpleExpr.Expr
 -- Copyright   :  (C) 2023 Alexey Tochin
@@ -34,7 +35,11 @@ import Control.Monad.Fix (fix)
 import Data.Fix (Fix (Fix, unFix))
 import Data.Functor.Classes (Eq1, liftEq)
 import Data.List (intercalate, (++))
-import NumHask (Additive, Distributive, Divisive, ExpField, Field, Multiplicative, Subtractive, TrigField, one, zero)
+import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero)
+#if MIN_VERSION_GLASGOW_HASKELL(9,6,2,0)
+#else
+import NumHask (Distributive, Field)
+#endif
 import qualified NumHask as NH
 import Prelude
   ( Bool (False),
@@ -233,12 +238,18 @@ instance Multiplicative SimpleExpr where
   one = number 1
   (*) = binaryFunc "·"
 
+#if MIN_VERSION_GLASGOW_HASKELL(9,6,2,0)
+#else
 instance Distributive SimpleExpr
+#endif
 
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
 
+#if MIN_VERSION_GLASGOW_HASKELL(9,6,2,0)
+#else
 instance Field SimpleExpr
+#endif
 
 instance ExpField SimpleExpr where
   exp = unaryFunc "exp"
