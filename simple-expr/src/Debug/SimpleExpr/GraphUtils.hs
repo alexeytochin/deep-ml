@@ -59,7 +59,7 @@ appendNodeToGraph newNodeName depNodeNames graph = foldr addArc initGraph depNod
 -- >>> x = variable "x"
 -- >>> y = variable "y"
 -- >>> exprToGraph [x + y, x - y]
--- fromList [("x",[("x+y",()),("x-y",())]),("x+y",[]),("x-y",[]),("y",[("x+y",()),("x-y",())])]
+-- fromList [("y",[("x-y",()),("x+y",())]),("x-y",[]),("x",[("x-y",()),("x+y",())]),("x+y",[])]
 exprToGraph :: Expr d => d -> DGraph String ()
 exprToGraph d = case content d of
   [] -> empty -- insertVertex (name e) empty

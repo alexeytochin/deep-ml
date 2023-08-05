@@ -1,4 +1,4 @@
-resolver: nightly
+resolver: lts-20.18 # 9.2.7
 
 packages:
   - inf-backprop

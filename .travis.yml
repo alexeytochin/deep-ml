@@ -27,7 +27,10 @@ addons:
 
 matrix:
   include:
-    - env: GHCVER=9.2.7 STACK_YAML=stack.yaml
+    - env: GHCVER=9.2.7 STACK_YAML=stack-20-18.yaml
+    - env: GHCVER=9.2.8 STACK_YAML=stack-20-26.yaml
+    - env: GHCVER=9.4.5 STACK_YAML=stack-21-0.yaml
+    - env: GHCVER=9.4.5 STACK_YAML=stack.yaml
     - env: GHCVER=head STACK_YAML=stack-head.yaml
   allow_failures:
     - env: GHCVER=head STACK_YAML=stack-head.yaml

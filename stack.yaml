@@ -1,4 +1,4 @@
-resolver: lts-20.18 # 9.2.7
+resolver: nightly-2023-08-05 # lts-21.6 # 9.4.5
 
 packages:
   - inf-backprop
