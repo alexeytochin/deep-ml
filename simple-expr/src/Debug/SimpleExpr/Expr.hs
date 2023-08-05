@@ -35,11 +35,7 @@ import Control.Monad.Fix (fix)
 import Data.Fix (Fix (Fix, unFix))
 import Data.Functor.Classes (Eq1, liftEq)
 import Data.List (intercalate, (++))
-import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero)
-#if MIN_VERSION_GLASGOW_HASKELL(9,6,2,0)
-#else
-import NumHask (Distributive, Field)
-#endif
+import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero, Distributive, Field)
 import qualified NumHask as NH
 import Prelude
   ( Bool (False),
