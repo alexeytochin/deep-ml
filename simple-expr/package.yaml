@@ -1,5 +1,5 @@
 name:                simple-expr
-version:             0.1.0.0
+version:             0.1.0.2
 license:             BSD3
 author:              "Alexey Tochin"
 maintainer:          "Alexey.Tochin@gmail.com"
@@ -8,8 +8,11 @@ copyright:           "2023 Alexey Tochin"
 extra-source-files:
   - CHANGELOG.md
 
+extra-doc-files:
+  - doc/images/*.png
+
 synopsis:            Minimalistic toolkit for simple mathematical expression.
-category:            Math
+category:            Mathematics
 
 description: |
   This is a minimalistic toolkit for simple mathematical expression developed for debug purposes similar to
@@ -23,11 +26,11 @@ description: |
     0
   @
 
-  Besides an expression visualization feature is supported.
+  Besides an expression visualization feature is also provided.
 
-  ![image description](doc/images/imaginary_expr_sum.png)
+  ![image description](docs/doc/images/imaginary_expr_sum.png)
   
-  See [tutorial](Debug-SimpleExpr-Tutorial.html) for details.
+  See [tutorial](docs/Debug-SimpleExpr-Tutorial.html) for details.
 
 dependencies:
   - base >= 4.7 && < 5

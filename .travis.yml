@@ -28,6 +28,9 @@ addons:
 matrix:
   include:
     - env: GHCVER=9.2.7 STACK_YAML=stack.yaml
+    - env: GHCVER=head STACK_YAML=stack-head.yaml
+  allow_failures:
+    - env: GHCVER=head STACK_YAML=stack-head.yaml
 
 before_install:
   # Download and unpack the stack executable
