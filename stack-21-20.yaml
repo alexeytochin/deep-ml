@@ -1,0 +1,5 @@
+resolver: lts-21.20 # ghc 9.4.7
+
+packages:
+  - inf-backprop
+  - simple-expr
