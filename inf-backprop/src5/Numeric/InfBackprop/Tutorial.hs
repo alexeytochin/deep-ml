@@ -1,0 +1,1493 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -Wno-unused-imports #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+-- | Module    :  Numeric.InfBackprop.Tutorial
+-- Copyright   :  (C) 202 Alexey Tochin
+-- License     :  BSD3 (see the file LICENSE)
+-- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
+--
+-- Tutorial for [inf-backprop](https://hackage.haskell.org/package/inf-backprop) package.
+module Numeric.InfBackprop.Tutorial
+  ( -- * Quick start #quick_start_simple_derivative#
+    -- $quick_start_simple_derivative
+
+    -- * Derivatives for symbolic expressions #derivatives-for-symbolic_expressions#
+    -- $derivatives-for-symbolic_expressions
+
+    -- * Symbolic expressions visualization #symbolic-expressions-visualization#
+    -- $symbolic-expressions-visualization
+
+    -- * How it works #how-it-works#
+    -- $how-it-works
+
+    -- ** The backpropagation derivative #backpropagation#
+    -- $backpropagation
+
+    -- ** Core type: 'BackpropDiff' #core-type-backpropdiff#
+    -- $core-type-backpropdiff
+
+    -- ** Functions overloading #functions-overloading#
+    -- $functions-overloading
+
+    -- * Derivatives for complex types #type-inference#
+    -- $type-inference
+
+    -- ** Tangent and cotangent spaces #tangent-space#
+    -- $tangent-space
+
+    -- ** Complex value function #multivalued-function#
+    -- $multivalued-function
+
+    -- ** Complex argument function #complex-argument-function#
+    -- $complex-argument-function
+
+    -- ** Fixed argument type #fixed-argument-type#
+    -- $fixed-argument-type
+
+    -- *** Gradinet over two-argument functions #complex-argument-function-of-two-argument-functions#
+    -- $gradient-of-two-argument-functions
+
+    -- *** Gradinet over function of tuples #complex-argument-function-over-function-of-tuples#
+    -- $gradient-over-function-of-tuples
+
+    -- *** Siskind-Pearlmutter example #siskind-pearlmutter-example#
+    -- $siskind-pearlmutter-example
+
+    -- ** Fixed value type #derivatives-with-any-datatypes#
+    -- $derivatives-with-any-datatypes
+
+    -- ** Fixed argument and value types #fixed-argument-and-value-types#
+    -- $fixed-argument-and-value-types
+
+    -- * Subexpression elimination #subexpression-elimination#
+    -- $subexpression-elimination
+  )
+where
+
+-- import GHC.Base ()
+
+import GHC.Base (Float)
+import Data.FiniteList (BoundedStream)
+import Data.Stream (Stream)
+import Debug.SimpleExpr (SE, variable)
+import Numeric.InfBackprop (BoxedVec, gradient, twoArgsDerivative, streamDerivative,
+  derivative2ArgsOverY, derivative, stopDiff, tupleDerivative, boxedVecDerivative,
+  Cotangent, CT,
+  )
+
+
+-- $quick-start-simple-derivative
+--
+-- >>> :{
+--    import GHC.Base (Float, fmap, ($))
+-- :}
+--
+-- Consider the square function
+--
+-- \[
+--   f(x) := x^2
+-- \]
+--
+-- as a simple example. We import a polymorphic version of the multiplication operator
+--
+-- >>> import NumHask (Multiplicative, (*), (+), log)
+--
+-- '(*)'@ :: @'Multiplicative'@ a => a -> a -> a@
+--
+-- from the
+-- [numhask](https://hackage.haskell.org/package/numhask)
+-- package.
+-- Specifically, for @a :: Float@ we have
+--
+-- >>> f x = x * x
+-- >>> fmap f [-3, -2, -1, 0, 1, 2, 3] :: [Float]
+-- [9.0,4.0,1.0,0.0,1.0,4.0,9.0]
+--
+-- Next, the first derivative
+--
+-- \[
+--   f'(x) = 2 \cdot x
+-- \]
+--
+-- can be computed as follows:
+--
+-- >>> import Numeric.InfBackprop (derivative)
+-- >>> f' = derivative f :: Float -> Float
+-- >>> fmap f' [-3, -2, -1, 0, 1, 2, 3]
+-- [-6.0,-4.0,-2.0,0.0,2.0,4.0,6.0]
+--
+-- It is important to provide a type annotation like @Float -> Float@ for 'f'' to ensure 
+-- correct type inference.
+--
+-- The second derivative
+--
+-- \[
+--   f''(x) = 2
+-- \]
+--
+-- is similarly straightforward:
+--
+-- >>> f'' = derivative $ derivative f :: Float -> Float
+-- >>> fmap f'' [-3, -2, -1, 0, 1, 2, 3]
+-- [2.0,2.0,2.0,2.0,2.0,2.0,2.0]
+--
+-- Of course, this approach also works for function compositions. For example:
+--
+-- \[
+--   g(x) := \log (x^2 + x^3)
+-- \]
+--
+-- >>> import NumHask.Extra (intPow)
+-- >>> g x = log (intPow 2 x + intPow 3 x)
+-- >>> g' = derivative g :: Float -> Float
+-- >>> g 1 :: Float
+-- 0.6931472
+-- >>> g' 1 :: Float
+-- 2.5
+
+-- $derivatives-for-symbolic-expressions
+--
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (($))
+-- >>> import NumHask ((*), sin, cos)
+-- >>> import NumHask.Extra (intPow)
+-- >>> import Debug.SimpleExpr (variable, simplify, SimpleExpr)
+-- >>> import Numeric.InfBackprop (derivative)
+--
+-- It would be more convenient to illustrate how differentiation works on symbolic 
+-- expressions
+--
+-- >>> type SE = SimpleExpr
+--
+-- rather than on floating-point numbers.
+--
+-- We use the
+-- [simple-expr](https://hackage.haskell.org/package/simple-expr)
+-- package here for symbolic expressions. For example, a symbolic function
+--
+-- \[
+--   f(x) := \sin x^2
+-- \]
+--
+-- can be defined as follows:
+--
+-- >>> x = variable "x"
+-- >>> f = \x -> sin (intPow 2 x)
+-- >>> f x
+-- sin(x*x)
+--
+-- Calculating the symbolic derivative
+--
+-- \[
+--   f'(x) := 2 x \cos x^2
+-- \]
+--
+-- of @f@ is straightforward
+--
+-- >>> f' = derivative f
+-- >>> simplify $ f' x :: SimpleExpr
+-- (2*x)*cos(x*x)
+--
+-- Notice that we still use the universal definitions of 'cos', '(*)' and ather operations 
+-- from the
+-- [numhask](https://hackage.haskell.org/package/numhask)
+-- package.
+
+-- $symbolic-expressions-visualization
+--
+-- The
+-- [simple-expr](https://hackage.haskell.org/package/simple-expr)
+-- package is equipped with a visualization tool that can be used to illustrate the 
+-- differentiation workflow.
+--
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (($), (.))
+-- >>> import Debug.SimpleExpr (SimpleExpr, variable, simplify, plotExpr, plotDGraphPng)
+-- >>> import Debug.DiffExpr (unarrySymbolicFunc)
+-- >>> import Numeric.InfBackprop (derivative)
+--
+-- As a warm-up, consider a simple composition of two symbolic functions:
+--
+-- \[
+--   x \mapsto g(f(x))
+-- \]
+--
+-- which can be defined as follows:
+--
+-- >>> x = variable "x" :: SimpleExpr
+-- >>> f = unarrySymbolicFunc "f" :: SimpleExpr -> SimpleExpr
+-- >>> g = unarrySymbolicFunc "g" :: SimpleExpr -> SimpleExpr
+-- >>> g (f x) :: SimpleExpr
+-- g(f(x))
+--
+-- This basic example can be plotted with:
+--
+-- @ plotExpr $ g (f x) @
+--
+-- ![image description](doc/images/composition.png)
+--
+-- The graph for the first derivative can be depicted with:
+--
+-- @ plotExpr $ simplify $ derivative (g . f) x @
+--
+-- ![image description](doc/images/composition_derivative.png)
+--
+-- Here,
+-- 'simplify'@ :: @'SimpleExpr'@ -> @'SimpleExpr'@
+-- is a function that removes unnecessary differentiation artifacts like @*1@ and @+0@.
+--
+-- The second derivative can be plotted in a similarly straightforward manner:
+--
+-- @ plotExpr $ simplify $ derivative (derivative (g . f)) x @
+--
+-- ![image description](doc/images/composition_second_derivative.png)
+
+-- $how-it-works
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (Float, fmap, ($), Int, (.), (<>))
+
+-- $backpropagation
+-- In order to clarify the concept of backpropagation, we consider the following example.
+-- Let @g@, @f@ and @h@ are tree simple
+-- \[\mathbb{R} \rightarrow \mathbb{R}\]
+-- functions. Consider the composition
+--
+-- \[
+--   x \mapsto g(f(h(x))).
+-- \]
+--
+-- The first derivative of the composition at @x@ is
+--
+-- \[
+--   x \mapsto h'(x) \cdot f'(h(x)) \cdot g'(f(h(x))).
+-- \]
+--
+-- The corresponding calculation diagram is a presented below.
+--
+-- ![image description](doc/images/backprop.drawio.png)
+--
+-- The upper path on the diagram from left to right hand sides is known as the forward 
+-- step of the calculation.
+-- The lower path from right to left hand sides is the backward step.
+--
+-- According to the backpropagation strategy,
+-- the order of the derivative calculation should be as follows:
+--
+-- 1. Find @h(x)@.
+--
+-- 2. Find @f(h(x))@.
+--
+-- 3. Find @g(f(h(x)))@.
+--
+-- 4. Find the top derivative @g'(f(h(x)))@.
+--
+-- 5. Find the next to the top derivative @f'(h(x))@.
+--
+-- 6. Multiply @g'(f(h(x)))@ on @f'(h(x))@.
+--
+-- 7. Find the next derivative @h'(x)@.
+--
+-- 8. Multiply the output of point 6 on @h'(x)@.
+--
+-- It could be reasonable to calculate the product of the derivatives in a diferent order,
+-- for example, from left to right (forward propagation).
+-- These are beyond the scope of the present library.
+--
+-- The generalizations for longer composition and vector valued function are 
+-- straightforward.
+
+
+-- $core-type-backpropdiff
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base ((.))
+-- >>> import NumHask ()
+-- >>> import Numeric.InfBackprop ()
+-- >>> import Control.Category ((>>>))
+--
+-- All calculations form the example above related to the function @f@
+-- can be divided into two parts.
+-- We have to find @f@ over @h(x)@ first (forward step)
+-- and then the derivative @f'@ of the same argument @h(x)@ and
+-- multiply it on the derivative @g'(f(h(x)))@
+-- obtained before during the similar calculations for @g@ (backward step).
+-- Notice that the value of @h(x)@ is reused on the backward step.
+-- The diagram illustration can ba as follows.
+--
+-- ![image description](doc/images/lens.drawio.png)
+--
+-- We can define the differentiable function from agrument type @a@ to value type @b@
+-- in Haskell as a tuple of functions @forward@
+-- and @backward@ as follows
+--
+-- @
+-- newtype DifferentiableFunc a b
+--    = MkDifferentiableFunc {forward :: a -> b, backward :: a -> CT b -> CT a}
+-- @
+--
+-- The role and meaning of type family 'CT' is clarified in the next
+-- [section](#g:tangent_space). For now we the reader can simple ignore it and assume
+-- @CT a ~ a@ for any type @a@.
+--
+-- We realize that the differentiable function can be represented as a law breaking lens
+-- @DifferentiableFunc a b ~ Lens a (CT a) b (CT b)@.
+-- The term @forward@ corresponds to @view@ and @backward@ corresponds to @set@.
+--
+-- In order to switch from ordinary function to differentiable functions, in principle,
+-- we can replace the category of ordinary Haskell functions '(->)' by the category of 
+-- @Lens@.
+-- To this end we have to use the categorical composition '(>>>)'
+-- or equivalently the lens composition @(%)@
+-- instead of the ordinary function composition '(.)'.
+-- However, we loss this way the ability to apply functions to arguments like @y = f x@.
+--
+-- In order to keep the habital terms like @sin :: a -> a@ and the ability to apply 
+-- functions to arguments
+-- we attract a different aproach flowing
+-- [ad](https://https://hackage.haskell.org/package/ad)
+-- and
+-- [backprop](https://hackage.haskell.org/package/backprop).
+-- This way we note first that if we fix some type @t@ we can map each lens
+-- @dFunc :: DifferentiableFunc a b@
+-- to the map
+-- on @iDfferentiableFunc t a -> iDfferentiableFunc t b@
+-- as follows
+--
+-- @
+-- lensToMap :: DifferentiableFunc a b -> DifferentiableFunc t a -> DifferentiableFunc t b
+-- lensToMap dFunc = dFunc <<<
+-- @
+--
+-- where @(<<<)@ is the lens categorical composition.
+-- Thereby, @lensToMap dFunc@ is just an ordinary Haskell function
+--
+-- @DifferentiableFunc t a -> DifferentiableFunc t b@.
+--
+-- From mathematial point of view,
+-- we apply the Yoneda lemma to the category of law breaking lenses.
+--
+-- The next step is to notice that the lens type
+--
+-- @DifferentiableFunc t a@
+--
+-- is ismorphic to
+--
+-- @
+-- t -> (a, CT a -> CT t)
+-- @
+--
+-- and only the value of
+-- @(a, CT a -> CT t)@
+-- is used in the compoisition with
+-- @DifferentiableFunc a b@.
+-- This means that we can drop the argument of type @t@ and reduce the map
+--
+-- @
+-- DfferentiableFunc t a -> DfferentiableFunc t b
+-- @
+--
+-- to the map
+--
+-- @
+-- (a, CT a -> CT t) -> (b, CT b -> CT t)
+-- @
+--
+-- This motivates the follwing type definition
+--
+-- @
+-- data BackpropDiff t a = MkBackpropDiff {value :: a, backprop :: CT a -> CT t}
+-- @
+--
+-- For example, the differentiable version of
+--
+-- @
+-- f :: Float -> Float
+-- @
+--
+-- with the derivative
+--
+-- @
+-- f' :: Float -> Float
+-- @
+--
+-- function can be defeined as follows.
+--
+-- @
+-- differentiableF :: BackpropDiff t Float -> BackpropDiff t Float
+-- differentiableF (MkBackpropDiff x backprop) = 
+--    MkBackpropDiff (f x) (\cx -> backprop $ (f' x) * cx)
+-- @
+--
+-- The value @y = f x@ of @f@ at $x$ can be extracted from @differentiableF@ by
+--
+-- @
+-- y = value $ differentiableF (MkBackpropDiff x id)
+-- @
+--
+-- The value @y' = f' x@ of the derivative @f'@ at $x$ can be extracted by
+--
+-- @
+-- y' = backprop (differentiableF (MkBackpropDiff x id)) (1 :: Float)
+-- @
+--
+-- The interpretation of the transition form type @a@ to @BackpropDiff t a@
+-- can be as follows.
+-- The first component
+-- @value@
+-- is just the value.
+-- The second component
+-- @backprop@
+-- is a stack for the backpropagation steps accumulations
+-- from the curren backpropagation value @CT a@ to desired value of type @CT t@.
+-- In the example above, the term
+--
+-- @
+-- (MkBackpropDiff x id) :: BackpropDiff Float Float
+-- @
+--
+-- is the initial value of the backpropagation stack. The term
+--
+-- @
+-- differentiableF (MkBackpropDiff x id) :: BackpropDiff Float Float
+-- @
+--
+-- Contain a single backropacation step that is
+--
+-- @
+-- (f' x) * :: Float -> Float
+-- @
+--
+-- To exatract the value of the derivative it is enugh to apply the backprop map
+-- to the initial value that is
+-- @1 :: Float@.
+--
+-- The generalization for a function composition is straightforward.
+
+-- $functions-overloading
+--
+-- Our goal now is to make functions such as @sin@ or @(*)@ differentiable and
+-- in the same time manipolate them as ordinary function, in partiucular,
+-- apply them to argunets and combine with the composition '(.)'.
+-- To this end we attract, for example,
+-- [numhask](https://hackage.haskell.org/package/numhask)
+-- package.
+-- In this package, functions, such as @sin@ or @(*)@, are polymorphic.
+-- For instance, the function @sin@ is an inner of typecalss
+--
+-- @
+-- class TrigField a where
+--    ...
+--    sin :: a -> a
+-- @
+--
+-- and
+--
+-- @
+-- class Multiplicative a where
+--    ...
+--    (*) :: a -> a -> a
+-- @
+--
+-- These typeclasses have instances in partucular for 'Float' type.
+-- To make @sin@ and @(*)@ differntiable (in the backpropagatein scheme)
+-- it is enough to add instances for
+--
+-- @
+-- BackpropDiff t Float
+-- @
+--
+-- These instancies can be implemented as follows (tey family @CT@ may be ignored for now)
+--
+-- @
+-- instance Additive (CT t) => TrigField (BackpropDiff t Float) where
+--   ...
+--   sin :: BackpropDiff t Float -> BackpropDiff t Float
+--   sin MkBackpropDiff {value = x, backprop = bacckpropX} = MkBackpropDiff {
+--       value = sin x,
+--       backprop = bacckpropX . ((cos x) *)
+--     }
+-- @
+--
+-- @
+-- instance Additive (CT t) => Multiplicative (BackpropDiff t Float) where
+--   ...
+--   (*) :: BackpropDiff t Float -> BackpropDiff t Float -> BackpropDiff t Float
+--   (MkBackpropDiff x backpropX) * (MkBackpropDiff y bacckpropY) =
+--     MkBackpropDiff {
+--         value = x * y,
+--         backprop = \cz -> backpropX (cz * y) + bacckpropY (x * cz)
+--       }
+-- @
+--
+-- In order to find the second derivative we have to attract the type
+-- @BackpropDiff (BackpropDiff Float Float) (BackpropDiff Float Float)@
+-- instead of @BackpropDiff Float Float@. And so on for highter order derivatives.
+-- The instances above can be generalized for any type @a@, but not just for 'Float',
+-- in order to have infinitely diferentiable functions.
+
+
+-- $type-inference
+-- The present libray supports derivative of function 
+-- @ f :: a -> b @ 
+-- of potentialy any types
+-- @a@ and @b@. 
+-- Thus, the derivative operator has the type 
+--
+-- @ 
+--    (a -> b) -> (a -> c) 
+-- @
+-- 
+-- The type argument @a@ is always the same for the function 
+-- @ f :: a -> b @
+-- and it's derivative 
+-- @ f' :: a -> c @.
+-- However, the type of value @c@ is in complex dependency on @a@ and @b@. 
+-- For example, the derivative of a vector valued function of a tuple 
+-- is a vector of tuples.
+-- 
+-- @
+--    ((Float, Float) -> BoxedVec 3 Float) -> ((Float, Float) 
+--      -> BoxedVec 3 (Float, Float))
+-- @
+-- 
+-- There are at least three approaches to the type inference for the derivative operator.
+-- 
+-- 1. Define a derivative operator for specific types @a@ and @b@. 
+-- See subsection [???]() 
+--
+-- 2. Define a derivative operator
+-- that is polymorphic over the type @b@ but with fixed
+-- type @a@. 
+-- See 'derivative' in subsection [Multivalued function](#g:multivalued_function).
+--
+-- 3. Define the derivative operator 
+-- that is polymorphic over the type @a@ but with fixed
+-- type @b@. 
+-- See 'gradient' in subsection [Gradinet](#g:gradient).
+--
+-- In the first subsection, however, is quite technical and can be skipped.
+
+
+-- $tangent-space
+--
+-- If the arguemnt of a scalar-valued function is a vector,
+-- the derivative of this function is the same, it is a vector as well.
+-- However, the type of value for the function and it'd derivative 
+-- is not   is not true in the genral case.
+--
+-- For example, if an arguemt is an infinte sequence (parcticaly iterator, stream, etc.),
+-- the derivative is a bounded sequence
+-- (a finite lenght vector of arbitrary length, see 'BoundedStream' data type) 
+-- and vice versa.
+--
+-- In order to be convinced, notice that the convolution of two streams
+-- is not defined. On the other hand, any liner functional on streams is necessarily
+-- a finite lenght vector.
+-- And vice versa,
+-- any finite lenght vector can be considered as a linear functional on streams.
+-- Besided, any linear function on bounded vectros of any length is an infinite sequence.
+-- And vice versa, any infinite sequence can be considered
+-- as a linear function on bounded vectors of any length.
+--
+-- This is not just a mathematical formality but a practical issue.
+-- The Haskell type system does not allow to define, for example, 
+-- a safe derivative of a function
+-- over 'Stream' as a 'Stream' or the derivative of a function over
+-- 'BoundedStream' as a 'BoundedStream'.
+--
+-- Another difficulty occures if we consider a function on a sphere in 3D real space,
+-- say, unit radius, for example.
+-- This case the derivative is not an abbitratry 3D vector,
+-- but a vector that is always tangent to the radius vector.
+-- Thereby, the type of the function argument does not coinside
+-- with the value type of the derivative.
+--
+-- From mathematica point of view, we consider functon on a manifold
+-- and the derivative takes values in the cotangent bundle of the manifold.
+--
+-- In order to overcome these difficulties, we attract the type family 'CT' ('Cotangent').
+-- In particular, we have
+--
+-- @ CT Float = Float@
+--
+-- @ CT (a, b) = (CT a, CT b)@
+--
+-- @ CT (Vector a) = Vector (CT a)@
+--
+-- @ CT (Stream a) = BoundedStream (CT a)@
+--
+-- @ CT (BoundedStream a) = Stream (CT a)@
+--
+-- @ CT (E2NormedVector a) = Vector (CT a)@
+--
+-- The type family 'CT' is a composition of to type families 'Dual' and 'Tangent'.
+--
+-- CT a = Dual (Tangent a)
+--
+-- The first one 'Dual' is responsible to the linear structure ,
+-- for instance , we have
+--
+-- @ Dual Float = Float@
+--
+-- @ Dual (Stream a) = BoundedStream (Dual a)@
+--
+-- @ Dual (BoundedStream a) = Dual (Stream a)@
+--
+-- @ Dual (E2NormedVector a) = undefined
+--
+-- The second one 'Tangent' is responsible to the building of the tangent space:
+--
+-- @ Tangent Float = Float@
+--
+-- @ Tangent (Stream a) = Stream (Tangent a)@
+--
+-- @ Tangent (BoundedStream a) = Tangent (BoundedStream a)@
+--
+-- @ Tangent (E2NormedVector a) = Vector (Tangent a)@
+--
+-- In order to be able to define the derivative over a Haskel type that is not covered
+-- by the present package one hase to define
+-- the both 'Tangent' and 'Dual' type families over it.
+
+
+-- $multivalued-function
+--
+-- We consider here how to take derivatives over multivalued functions.
+--
+-- >>> :{
+--    import GHC.Base (Float, fmap, ($), Int, (.), (<>))
+--    import GHC.Show (show)
+--    import Data.Tuple (fst, snd)
+--    import NumHask ((*), (+), log, Multiplicative, cos, sin, TrigField, Additive)
+--    import Prelude.Tools (cross)
+--    import Data.Stream (Stream, take, fromList)
+--    import Debug.DiffExpr (SymbolicFunc, unarrySymbolicFunc, BinarySymbolicFunc,
+--      binarySymbolicFunc)
+--    import qualified Data.Vector.Fixed as DVF
+--    import qualified Data.Vector.Generic.Sized as DVGS
+--    import qualified Data.Vector as DV
+--    import Debug.SimpleExpr (variable, SE, simplify)
+--    import Numeric.InfBackprop (derivative, BoxedVec)
+-- :}
+--
+-- As the first example we define a symbolic function @f@ with two values,
+-- which menas in Haskell
+-- that the function is tuple-valued.
+--
+-- >>> :{
+--   f :: TrigField a => a -> (a, a)
+--   f t = (cos t, sin t)
+-- :}
+--
+-- Defeine a symbolic variable 't' like in
+-- [Derivatives for symbolic expressions](#g:derivatives-for-symbolic-expressions)
+--
+-- >>> t = variable "t"
+-- >>> f t
+-- (cos(t),sin(t))
+--
+-- The simples way to take the derivative is to use `derivative` operator,
+-- which is polymorphic over the function value type.
+-- The common type signature of `derivative` is discussed in ???.
+-- For the current case it can be simplified to
+--
+-- @derivative :: (a -> (a, a)) -> SE -> (SE, SE)@
+--
+-- We can `derivative` as follows
+--
+-- >>> f' = simplify . derivative f :: SE -> (SE, SE)
+-- >>> f' t
+-- (-(sin(t)),cos(t))
+--
+-- >>> f'' = simplify . derivative (derivative f) :: SE -> (SE, SE)
+-- >>> f'' t
+-- (-(cos(t)),-(sin(t)))
+--
+-- >>> f''' = simplify . derivative (derivative (derivative f)) :: SE -> (SE, SE)
+-- >>> f''' t
+-- (sin(t),-(cos(t)))
+--
+-- For the next example that is the derivative of vector valued symbolic function 'v'
+-- we attract boxed vectors from
+-- [vectro-sized](https://hackage.haskell.org/package/vector-sized)
+-- library. The examples below are straightforward.
+--
+-- >>> :{
+--   v :: SymbolicFunc a => a -> BoxedVec 3 a
+--   v t = DVGS.fromTuple (
+--      unarrySymbolicFunc "v_x" t,
+--      unarrySymbolicFunc "v_y" t,
+--      unarrySymbolicFunc "v_z" t
+--    )
+-- :}
+--
+-- >>> v t
+-- Vector [v_x(t),v_y(t),v_z(t)]
+--
+-- >>> v' = simplify . derivative v :: SE -> BoxedVec 3 SE
+-- >>> v' t
+-- Vector [v_x'(t),v_y'(t),v_z'(t)]
+--
+-- Other datatypes and lazy types such as streams from
+-- [stream](https://hackage.haskell.org/package/stream)
+-- library can be differentiated as well. For example:
+--
+-- >>> :{
+--   s :: SymbolicFunc a => a -> Stream a
+--   s t = fromList [unarrySymbolicFunc ("s_" <> show n) t | n <- [0..]]
+-- :}
+--
+-- >>> take 5 (s t)
+-- [s_0(t),s_1(t),s_2(t),s_3(t),s_4(t)]
+--
+-- >>> :{
+--  s' :: SE -> Stream SE
+--  s' = simplify . derivative s
+-- :}
+--
+-- >>> take 5 (s' t)
+-- [s_0'(t),s_1'(t),s_2'(t),s_3'(t),s_4'(t)]
+--
+-- We can differentiate a function taking values in any nested type. For instance,
+--
+-- >>> :{
+--   g :: SymbolicFunc a => a -> (BoxedVec 3 a, Stream a)
+--   g t = (v t, s t)
+-- :}
+--
+-- is a a function from type @a@ onto a tuple of 3-vector of @a@ and a stream of @a@.
+-- The automatic differentiation is still straightforward.
+--
+-- >>> :{
+--    g' :: SE -> (BoxedVec 3 SE, Stream SE)
+--    g' = simplify . derivative g
+-- :}
+--
+-- >>> fst $ g' t
+-- Vector [v_x'(t),v_y'(t),v_z'(t)]
+--
+-- >>> take 5 $ snd $ g' t
+-- [s_0'(t),s_1'(t),s_2'(t),s_3'(t),s_4'(t)]
+
+
+-- $complex-argument-function
+--
+-- This section is devoted to the differentiation of scalar valued functions 
+-- of any number of arguments of any types.
+--
+-- >>> :{
+--    import Data.Type.Equality (type (~))
+--    import GHC.Base (Float, ($), (.), (<>), Int, Float)
+--    import GHC.Show (show)
+--    import NumHask (Additive, Multiplicative, Distributive, (+), zero, (*), one, (-), 
+--      sum)
+--    import Data.Vector.Generic.Sized (foldl', Vector)
+--    import qualified Data.Vector.Generic.Sized as DVGS
+--    import Numeric.InfBackprop (twoArgsDerivative, gradient, BoxedVec, CT, initDiff,
+--      value, streamArg, backprop)
+--    import Debug.DiffExpr (SymbolicFunc, BinarySymbolicFunc, binarySymbolicFunc,
+--      unarrySymbolicFunc)
+--    import Debug.SimpleExpr (variable, SE, simplify, number)
+--    import Data.Tuple (uncurry, fst, snd)
+--    import Data.Stream (Stream, take, fromList, head, (!!))
+--    import Data.FiniteList (BoundedStream, bHead, unit)
+--    import GHC.Natural (Natural, minusNatural)
+--    import qualified Data.Vector as DV
+-- :}
+--
+-- The operator 'gradient' is designed for this purpose.
+-- Techically the argument must be combined into a single type.
+-- For example, in the case of two arguments,
+-- we consider a function of a tuple in the same vein as in section
+-- [Gradient of function of tuples](#g:gradient_of_function_of_tuples)
+-- below.
+-- 
+-- Define a couple of symbolic functions
+--
+-- >>> f = unarrySymbolicFunc "f" :: SymbolicFunc a => a -> a
+-- >>> g = unarrySymbolicFunc "g" :: SymbolicFunc a => a -> a
+--
+-- and thier arithmetic product
+-- 
+-- >>> :{
+--   fg :: (SymbolicFunc a, Multiplicative a) => (a, a) -> a
+--   fg (x, y) = f x * g y
+-- :}
+--
+-- The derivative (gradinet) can be found as follows
+-- 
+-- >>> fg' = simplify . gradient @SE fg :: (SE, SE) -> (SE, SE)
+--
+-- Notice we have to path the type argument 'SE' to 'gradient'.
+-- It is the type with respect to which the differentiation is going on.
+--
+-- In order to calculate the symbolic value of the derivative define first the variables
+--  
+-- >>> x = variable "x"
+-- >>> y = variable "y"
+-- >>> z = variable "z"
+--
+-- Thus, the gradient of the function @fg@ is
+--
+-- >>> fg' (x, y)
+-- (f'(x)*g(y),g'(y)*f(x))
+--
+-- The second example for the gradient could be a function over boxed vector 'BoxedVec'.
+-- Difine first the squared Euclidean norm of a 3-dimentional vector.
+--
+-- >>> :{
+--    eNorm2 :: Distributive a => BoxedVec 3 a -> a
+--    eNorm2 x = foldl' (+) zero (x * x)
+-- :}
+--
+-- The gradient of 'eNorm2' can be calculated as follows
+-- 
+-- >>> :{
+--    eNorm2' :: forall a. (Distributive a, CT a ~ a) => BoxedVec 3 a -> BoxedVec 3 a
+--    eNorm2' = gradient @a eNorm2
+-- :}
+--
+-- As usual thi gradient function can be applied, in particular, 
+-- to the symbolic expressions type 'SE'
+--
+-- >>> v = DVGS.fromTuple (x, y, z) :: BoxedVec 3 SE
+-- >>> simplify $ eNorm2' v :: BoxedVec 3 SE
+-- Vector [x+x,y+y,z+z]
+--
+-- or to 'Float' type:
+-- 
+-- >>> v = DVGS.fromTuple (1, 2, 3) :: BoxedVec 3 Float
+-- >>> eNorm2' v :: BoxedVec 3 Float
+-- Vector [2.0,4.0,6.0]
+--
+-- The type 'Stream' is not an exception. 
+-- Define first a formal series over symbolic expressions 
+--
+-- \[
+--    s = s_0, s_1, s_2, s_3, \ldots
+-- \] 
+--
+-- by
+-- 
+-- >>> s = fromList [variable ("s_" <> show n) | n <- [0 :: Int ..]] :: Stream SE
+--
+-- Define a function over it 
+-- that simply takes the sum of the first four elements of a stream.
+-- 
+-- \[
+--   s \mapsto s_0 + s_1 + s_2 + s_3 
+-- \]
+--
+-- >>> take4Sum = sum . take 4 :: (Additive a) => Stream a -> a
+-- >>> simplify $ take4Sum s :: SE
+-- s_0+(s_1+(s_2+s_3))
+--
+-- This function s
+-- The gradient sunction can be calculated as follows 
+--
+-- >>> :{
+--    take4Sum' :: forall a. (Distributive a, Distributive (CT a)) => 
+--      Stream a -> BoundedStream (CT a)
+--    take4Sum' = gradient @a take4Sum 
+-- :}
+--
+-- We expect to have the sequence
+--
+-- \[
+--   1, 1, 1, 1, 0, 0, 0, \ldots 
+-- \]
+--
+-- as the gradient of the function 'take4Sum'.
+--
+-- >>> simplify $ take4Sum' s :: BoundedStream SE
+-- Bounded stream of length = 4, value = 1, 1, 1, 1, 0, 0, ...
+--
+-- The ''gradient' operator may be applied to composite types as well. 
+-- For example, consider a function @g@ of a 3-vector and a stream.
+--
+-- >>> :{
+--    g :: (SymbolicFunc a, Distributive a) => (BoxedVec 3 a, Stream a) -> a
+--    g (v, s) = eNorm2 v + take4Sum s
+-- :}
+--
+-- >>> :{
+--    g' :: forall a. (SymbolicFunc a, Distributive a, Distributive a, CT a ~ a) 
+--      => (BoxedVec 3 a, Stream a) -> (BoxedVec 3 a, BoundedStream a)
+--    g' = gradient @a g
+-- :}
+--
+-- Define the radius vector @r@ for convenience.
+-- The values of the gradient at @(r, s)@ where 
+-- 
+-- >>> r = DVGS.fromTuple (x, y, z) :: BoxedVec 3 SE
+-- 
+-- are
+-- 
+-- >>> simplify $ fst $ g' (r, s) :: BoxedVec 3 SE
+-- Vector [x+x,y+y,z+z]
+--
+-- >>> simplify $ snd $ g' (r, s) :: BoundedStream SE
+-- Bounded stream of length = 4, value = 1, 1, 1, 1, 0, 0, 0, ...
+
+
+-- $fixed-argument-type
+--
+-- In section [Complex argument function](#g:gradient), 
+-- we have considered the operator 'gradient',
+-- that is polymorpfic over the argument type, but aplicable only 
+-- for scalar values funciton.
+-- In contrast, the operator 'derivative' from section 
+-- [Complex value function](#g:multivalued-function)
+-- is polymorphic over the value type,
+-- but aplicable only for a function of a single argument.
+-- In this subsection, we consider a modification of 'derivative'
+-- that is able to differentiate function over tuple and other fixed
+-- types of arguments and in the same time polymorphic over the value type.
+-- These functions are, in particular, convinient if we need to work with
+-- Hessians and higher order derivatives.
+
+
+-- $gradient-of-two-argument-functions
+--
+-- Here we focus on taking partial derivatives of functions with two arguents.
+-- 
+-- >>> :{
+--    import GHC.Base (Float, ($), (.))
+--    import NumHask (Distributive, (+), zero, (*))
+--    import Data.Vector.Generic.Sized (foldl', Vector)
+--    import qualified Data.Vector.Generic.Sized as DVGS
+--    import Numeric.InfBackprop (twoArgsDerivative, gradient, BoxedVec)
+--    import Debug.SimpleExpr (variable, SE, simplify)
+--    import Debug.DiffExpr (binarySymbolicFunc, BinarySymbolicFunc)
+--    import Debug.DiffExpr (SymbolicFunc, unarrySymbolicFunc, BinarySymbolicFunc, binarySymbolicFunc)
+--    import Data.Tuple (uncurry)
+-- :}
+--
+-- For a quick start we consider a symbolic function 'h' of two arguments
+-- (see [Derivatives for symbolic expressions](#g:derivatives-for-symbolic-expressions)).
+--
+-- >>> x = variable "x"
+-- >>> y = variable "y"
+-- >>> h = binarySymbolicFunc "h" :: BinarySymbolicFunc a => a -> a -> a
+-- >>> h x y
+-- h(x,y)
+--
+-- We attract here the operator
+-- 'twoArgsDerivative'
+-- wiht a quite tricky signature considered in section ???.
+-- For the current example, it can be applied as follows.
+--
+-- >>> :{
+--    h' :: SE -> SE -> (SE, SE)
+--    h' x y = simplify $ twoArgsDerivative h x y
+-- :}
+--
+-- >>> h' x y
+-- (h'_1(x,y),h'_2(x,y))
+--
+-- >>> :{
+--    h'' :: SE -> SE -> ((SE, SE), (SE, SE))
+--    h'' x y = simplify $ twoArgsDerivative (twoArgsDerivative h) x y 
+-- :}
+--
+-- >>> h'' x y
+-- ((h'_1'_1(x,y),h'_1'_2(x,y)),(h'_2'_1(x,y),h'_2'_2(x,y)))
+--
+-- We can see that 'twoArgsDerivative' is polymorphic over the function value type,
+-- but it can be aplied to two argumant functions only.
+-- In contrast, 'gradent' is not polymorphic over the function value,
+-- but can be applied to a function of any argument,
+-- see [Gradient operator](#g:gradient-operator) section for details.
+
+
+-- $gradient-over-function-of-tuples
+--
+-- Function over tuppples are equivalent to two argument functions.
+-- We can differentiate them in the same way as.
+--
+-- >>> :{
+--    import GHC.Base (Float, ($), (.))
+--    import NumHask ((*), Multiplicative)
+--    import Numeric.InfBackprop (tupleDerivative)
+--    import Debug.SimpleExpr (variable, SE, simplify, number)
+--    import Debug.DiffExpr (binarySymbolicFunc, BinarySymbolicFunc)
+--    import Debug.DiffExpr (SymbolicFunc, unarrySymbolicFunc, BinarySymbolicFunc,
+--      binarySymbolicFunc)
+-- :}
+--
+-- For a simple example consider a product of symbolic functions 'f' and 'g'
+-- of different arguments.
+--
+-- >>> :{
+--   x = variable "x"
+--   y = variable "y"
+--   f :: SymbolicFunc a => a -> a
+--   f = unarrySymbolicFunc "f"
+--   g :: SymbolicFunc a => a -> a
+--   g = unarrySymbolicFunc "g"
+--   fg :: (SymbolicFunc a, Multiplicative a) => (a, a) -> a
+--   fg (x, y) = f x * g y
+-- :}
+--
+-- >>> fg (x, y) :: SE
+-- f(x)*g(y)
+--
+-- The operator 'tupleDerivative' is practically equivalent
+-- to 'twoArgsDerivative', however it disigned
+-- for function over a tuple, but not two argument functions.
+--
+-- >>> :{
+--  fg' :: (SE, SE) -> (SE, SE)
+--  fg' = simplify . tupleDerivative fg
+-- :}
+--
+-- >>> fg' (x, y)
+-- (f'(x)*g(y),g'(y)*f(x))
+--
+-- >>> :{
+--   fg'' :: (SE, SE) -> ((SE, SE), (SE, SE))
+--   fg'' = simplify . tupleDerivative (tupleDerivative fg)
+-- :}
+--
+-- >>> fg'' (x, y)
+-- ((f''(x)*g(y),g'(y)*f'(x)),(f'(x)*g'(y),g''(y)*f(x)))
+--
+-- >>> :{
+--  fg''' :: (SE, SE) -> (((SE, SE), (SE, SE)), ((SE, SE), (SE, SE)))
+--  fg''' = simplify . tupleDerivative (tupleDerivative (tupleDerivative fg))
+-- :}
+--
+-- >>> fg''' (x, y)
+-- (((f'''(x)*g(y),g'(y)*f''(x)),(f''(x)*g'(y),g''(y)*f'(x))),((f''(x)*g'(y),g''(y)*f'(x)),(f'(x)*g''(y),g'''(y)*f(x))))
+--
+-- As well as 'twoArgsDerivative', 'tupleDerivative' is also polymorphic 
+-- over the function value type.
+
+
+-- $siskind-pearlmutter-example
+--
+-- >>> :{
+--    import GHC.Base (Float, ($), (.))
+--    import NumHask ((*), (+))
+--    import Numeric.InfBackprop (derivative, gradient, derivative2ArgsOverY, stopDiff)
+--    import Debug.SimpleExpr (variable, SE, simplify, number)
+-- :}
+--
+-- We are ready to consider the automatic differentiation example from
+-- [Siskind and Pearlmutter, "Perturbation Confusion and Referential Transparency"]
+-- (https://engineering.purdue.edu/~qobi/papers/ifl2005.pdf)
+--
+-- \[
+--    \left.
+--      \frac{\partial}{\partial x}
+--      \left(
+--        x
+--          \left(
+--            \left.
+--              \frac{\partial}{\partial y}
+--              \left(
+--                x + y
+--              \right)
+--            \right|_{y=1}
+--          \right)
+--      \right)
+--    \right|_{x=1}
+--    = 1
+-- \]
+--
+-- To this end we can apply first the partial derivative operator 'derivative2ArgsOverY'
+-- that takes a two argument function 
+-- and returs the partial derivative over the second argument.
+-- In order to implemnt
+--
+-- \[
+--    \frac{\partial}{\partial y}
+--    (x \cdot y)
+--    = x
+-- \]
+--
+-- we can use is as follows
+--
+-- >>> x = variable "x"
+-- >>> y = variable "y"
+-- >>> simplify $ derivative2ArgsOverY (*) x y :: SE
+-- x
+--
+-- The next ingerdient is 'stopDiff'.
+-- The term
+-- @stopDiff 1@
+-- is practically a substitution operation
+-- \[ y \rightarrow 1 \]
+--
+-- Now we can have
+-- \[
+--    \left.
+--      \frac{\partial}{\partial y}
+--      (x \cdot y)
+--    \right|_{y=1} 
+--    = x
+-- \]
+-- as follows 
+--
+-- >>> simplify $ derivative2ArgsOverY (*) x (stopDiff (number 1)) :: SE
+-- x
+-- 
+-- The next step is to implement
+--
+-- \[
+--    \frac{d}{dx}
+--    \left.
+--      \frac{\partial}{\partial y}
+--      (x \cdot y)
+--    \right|_{y=1}
+--    = 1
+-- \]
+--
+-- >>> :{
+--    simplify $
+--      (derivative $ \x_ -> derivative2ArgsOverY (*) x_ (stopDiff $ number 1)) x :: SE
+-- :}
+-- 1
+--
+-- We can do the same not only for 'SE' data type but, 
+-- for example, for 'Float' as well.
+--
+-- >>> :{
+--    derivative 
+--      (\x -> x * derivative2ArgsOverY (+) x (stopDiff (1 :: Float)))
+--      (2024 :: Float)
+-- :}
+-- 1.0
+--
+-- We have to specify some floating point number inatead of the argument 'x'.
+
+
+-- $derivatives-with-any-datatypes
+--
+-- In the previous section 
+-- [Fixed argument type](fixed-argument-type)
+-- we considerd derivative operators that are polymorphic over the function value type
+-- but not over the function argument type that is fixed for each particular operator.
+-- This subsection is dedicated to thier conterparts 
+-- that are polymorphic over the function argument type 
+-- but not over the function value type that is fixed.
+--
+-- >>> :{
+--    import GHC.Base (($))
+--    import qualified Data.Vector.Generic.Sized as DVGS
+--    import NumHask ((*), TrigField, ExpField, sin, cos)
+--    import Debug.SimpleExpr (variable, SE, simplify)
+--    import Numeric.InfBackprop (tupleDerivative, DerivativeWith, BoxedVec)
+-- :}
+-- 
+-- 
+--
+-- >>> :{
+--    sphericToVec :: (TrigField a) => (a, a) -> BoxedVec 3 a
+--    sphericToVec (theta, phi) = 
+--      DVGS.fromTuple (sin theta * cos phi, sin theta * sin phi, cos theta)
+-- :}
+--
+-- >>> :{
+--    sphericToVec' :: (TrigField a, ExpField a, DerivativeWith a, a ~ CT a) => 
+--      (a, a) -> BoxedVec 3 (a, a)
+--    sphericToVec' = tupleDerivative sphericToVec
+-- :}
+--
+-- >>> :{
+--   x = variable "x"
+--   y = variable "y"
+-- :}
+--
+-- >>> simplify $ sphericToVec' (x, y) :: BoxedVec 3 (SE, SE)
+-- Vector [(cos(x)*cos(y),-(sin(y)*sin(x))),(cos(x)*sin(y),cos(y)*sin(x)),(-(sin(x)),0)]
+--
+
+
+--
+-- >>> :{
+--    import GHC.Base (Float, fmap, ($), (.), Float)
+--    import Data.Proxy (Proxy(Proxy))
+--    import NumHask ((*), (^), (+), zero, log, Multiplicative, Distributive, cos, sin,
+--      TrigField, Additive)
+--    import Data.Vector.Generic.Sized (foldl', Vector)
+--    import Numeric.InfBackprop (gradient, customArgDerivative, boxedVecArg, BoxedVec,
+--      tupleDerivative)
+--    import GHC.TypeNats (KnownNat)
+--    import qualified Data.Vector as DV
+--    import qualified Data.Vector.Generic.Sized as DVGS
+-- :}
+--
+-- Operators like 'twoArgsDerivative', 'tupleDerivative', 'tupleDerivative', 
+-- 'boxedVecDerivative', 'streamDerivative', and other similar operators
+-- considered in the previous sections
+-- are polymorphic over the function value type but not function argument type.
+-- They are convenient for taking high-order derivatives.
+-- It is because the function argument type is kept unchange during the differentiation
+-- while the function value type is modified,
+-- see [Derivatives of function of tuples](#g:derivatives-of-function-of-tuples).
+--
+--
+-- Custom argument derivative
+-- 
+-- 
+--
+-- Besides 'tupleDerivative' there are also 'boxedVecDerivative', 'streamDerivative' 
+-- and other similar operators.
+-- Moreover we can easily define a new operator for any nested datatype.
+--
+--
+-- For example, consider first a simple example of a function @eNorm2@ 
+-- that calculates the squared Euclidean norm
+-- of a vector.
+--
+--
+-- >>> :{
+--    eNorm2 :: Distributive a => BoxedVec 3 a -> a
+--    eNorm2 x = foldl' (+) zero (x * x)
+-- :}
+--
+-- >>> boxedVecDerivative = customArgDerivative boxedVecArg
+--
+-- >>> v = DVGS.fromTuple (1, 2, 3) :: BoxedVec 3 Float
+-- >>> boxedVecDerivative eNorm2 v :: BoxedVec 3 Float
+-- Vector [2.0,4.0,6.0]
+--
+-- >>> boxedVecDerivative (boxedVecDerivative eNorm2) v :: BoxedVec 3 (BoxedVec 3 Float)
+-- Vector [Vector [2.0,0.0,0.0],Vector [0.0,2.0,0.0],Vector [0.0,0.0,2.0]]
+--
+-- >>> boxedVecDerivative (boxedVecDerivative (boxedVecDerivative eNorm2)) v :: BoxedVec 3 (BoxedVec 3 (BoxedVec 3 Float))
+-- Vector [Vector [Vector [0.0,0.0,0.0],Vector [0.0,0.0,0.0],Vector [0.0,0.0,0.0]],Vector [Vector [0.0,0.0,0.0],Vector [0.0,0.0,0.0],Vector [0.0,0.0,0.0]],Vector [Vector [0.0,0.0,0.0],Vector [0.0,0.0,0.0],Vector [0.0,0.0,0.0]]]
+
+
+-- $fixed-argument-and-value-types
+--
+-- ???
+
+
+-- $subexpression-elimination
+--
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (Float, fmap, ($), Int, (.), (<>), id, const)
+-- >>> import GHC.Show (show)
+-- >>> import Debug.DiffExpr (unarrySymbolicFunc, binarySymbolicFunc, SymbolicFunc, BinarySymbolicFunc, TraceSymbolicFunc, traceUnarrySymbolicFunc, traceBinarySymbolicFunc, TraceBinarySymbolicFunc, TracedSimpleExpr, TSE)
+-- >>> import Debug.SimpleExpr (variable, simplify, simplifyExpr, SimpleExpr, number)
+-- >>> import Debug.Traced (Traced(MkTraced))
+-- >>> import Numeric.InfBackprop (derivative, value, initDiff, CT, backprop)
+-- >>> import NumHask ((+), Additive, log, (*), (-), (/), exp)
+-- >>> import qualified Data.Vector.Generic.Sized as DVGS
+-- >>> import qualified Data.Vector as DV
+--
+-- Some of the intermediate calculation results on the forward step
+-- (see [backpropagation](#g:backpropagation))
+-- can be reused on the backward step.
+-- For deep neural networks, this can be a significant computational advantage.
+-- It can be understood as a subespression elimination problem that Haskell is not strong with.
+-- In order have this feature for sure without counting on GHC we modify the type
+-- @Diff@ from
+--
+-- >>> data DiffNoCache t a = MkDiffNoCache {valueNoCache :: a, backpropNoCache :: CT a -> CT t}
+--
+-- to
+--
+-- >>> data DiffCache t a = forall h. MkDiffCache {valueCache :: a, backpropCache :: h -> CT a -> CT t, cache :: h}
+--
+-- We add the field @cache :: h@ into @Diff@ of existential type @h@ that is dedicated to store the intermediate
+-- results of forward step for possible usage on the backward step.
+-- The second modification of $Diff$ is the replacement of
+-- @backprop :: CT a -> CT t@ by @backpropCache :: h -> CT a -> CT t@.
+-- This is the function that takes the cache and the derivative of the output value
+-- and returns the derivative of the input value.
+--
+-- >>> :{
+--    f, g, h :: SymbolicFunc a => a -> a
+--    f = unarrySymbolicFunc "f"
+--    g = unarrySymbolicFunc "g"
+--    h = unarrySymbolicFunc "h"
+--    k :: BinarySymbolicFunc a => a -> a -> a
+--    k = binarySymbolicFunc "k"
+--    xVar = MkTraced $ variable "x"
+--    subexpF :: (SymbolicFunc a) => a -> (a, a)
+--    subexpF x = (g y, h y) where y = f x
+--    subexpK :: (SymbolicFunc a, BinarySymbolicFunc a, Additive a) => a -> a
+--    subexpK x = k (g y) (h y) where y = f x
+-- :}
+--
+-- >>> simplify $ (derivative subexpF) xVar :: (TracedSimpleExpr, TracedSimpleExpr)
+-- (MkTraced  <<< TRACING: Calculating f' of x >>>
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g' of f(x) >>>
+-- f'(x)*g'(f(x)),MkTraced  <<< TRACING: Calculating h' of f(x) >>>
+-- f'(x)*h'(f(x)))
+--
+-- -- >>> simplify $ (derivative subexpK) xVar :: TracedSimpleExpr
+--
+-- >>> :{
+--   v :: SymbolicFunc a => a -> DVGS.Vector DV.Vector 3 a
+--   v t = DVGS.fromTuple (unarrySymbolicFunc "v_x" t, unarrySymbolicFunc "v_y" t, unarrySymbolicFunc "v_z" t)
+-- :}
+--
+-- -- >>> (derivative (v . f)) xVar :: DVGS.Vector DV.Vector 3 TracedSimpleExpr
+--
+-- -- >>> backprop (subexpK (initDiff xVar)) (MkTraced $ number 1)
+
+-- To illustrate the idea we consider the following example.
+-- Let we would like to define a differentiable hyperbolic cosine function
+-- \[ ch x = \frac{\e^x + \e^{-x}}{2} \]
+-- and its derivative
+-- \[ sh x = \frac{\e^x - \e^{-x}}{2} \]
+-- such that the values of \[e^x\] and \[e^{-x}\] are reused on the backward step.
+--
+-- The implementation can be
+--
+-- >>> expTrace x = trace (" <<< TRACING: Calculating exp of " <> show x <> " >>>") (exp x)
+--
+-- >>> :{
+--    chNoCache :: DiffNoCache Float Float -> DiffNoCache Float Float
+--    chNoCache MkDiffNoCache {valueNoCache = x, backpropNoCache = backpropX} =
+--      MkDiffNoCache {
+--          valueNoCache = ePlus + eMinus,
+--          backpropNoCache = \cy -> backpropX ((ePlus - eMinus) * cy)
+--        } where
+--          ePlus = expTrace $ x / 2
+--          eMinus = expTrace $ -x / 2
+-- :}
+--
+-- >>> :{
+--    chCache :: DiffCache Float Float -> DiffCache Float Float
+--    chCache MkDiffCache {valueCache = x, backpropCache = backpropX, cache = h} =
+--      MkDiffCache {
+--          valueCache = ePlus + eMinus,
+--          backpropCache = \(ePlus_, eMinus_, h_) cy -> backpropX h_ ((ePlus - eMinus) * cy),
+--          cache = (ePlus, eMinus, h)
+--        } where
+--        ePlus = expTrace $ x / 2
+--        eMinus = expTrace $ -x / 2
+-- :}
+--
+-- >>> :{
+--    squareNoCache :: DiffNoCache Float Float -> DiffNoCache Float Float
+--    squareNoCache MkDiffNoCache {valueNoCache = x, backpropNoCache = backpropX}
+--      = MkDiffNoCache {valueNoCache = x * x, backpropNoCache = \cy -> backpropX (2 * x * cy)}
+-- :}
+--
+-- >>> :{
+--    squareCache :: DiffCache Float Float -> DiffCache Float Float
+--    squareCache MkDiffCache {valueCache = x, backpropCache = backpropX, cache = h}
+--      = MkDiffCache {valueCache = x * x, backpropCache = \h_ cy -> backpropX h_ (2 * x * cy), cache = h}
+-- :}
+--
+-- >>> endBackpropNoCache x = MkDiffNoCache x id
+-- >>> endBackpropCache x = MkDiffCache x (const id) ()
+--
+-- >>> derivativeCache f x = temp (f x) where temp (MkDiffCache _ bp h) = bp h 1
+--
+--
+-- >>> backpropNoCache ((squareNoCache . chNoCache) (endBackpropNoCache 2)) 1
+--  <<< TRACING: Calculating exp of 1.0 >>>
+--  <<< TRACING: Calculating exp of -1.0 >>>
+-- 14.507441
+--
+-- >>> derivativeCache (squareCache . chCache) (endBackpropCache 2)
+--  <<< TRACING: Calculating exp of 1.0 >>>
+--  <<< TRACING: Calculating exp of -1.0 >>>
+-- 14.507441
+--
+-- We can see that we must accumulate the caches from each of the stages of the forward step into a kind of stack
+-- and take back the values from the stack on the backward step.
+--
+-- We will demonstrate now how it works for simbolic functions
+--
+--
+--
+--
+-- we can use the 'trace' function from
+--
+--
+--
+-- >>> h(g(f xVar)) :: SimpleExpr
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of g(f(x)) >>>
+-- h(g(f(x)))
+--
+-- >>> value (subexpK (initDiff xVar))
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of f(x) >>>
+--  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
+-- k(g(f(x)),h(f(x)))
+--
+--
+-- >>> simplify $ derivative (h . g . f) xVar :: SimpleExpr
+--  <<< TRACING: Calculating f' of x >>>
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g' of f(x) >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h' of g(f(x)) >>>
+-- f'(x)*(g'(f(x))*h'(g(f(x))))
+--
+--
+--
+--
+-- >>> simplify $ subexpF xVar :: (SimpleExpr, SimpleExpr)
+-- ( <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+-- g(f(x)), <<< TRACING: Calculating h of f(x) >>>
+-- h(f(x)))
+--
+-- >>> simplify $ subexpK xVar :: SimpleExpr
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of f(x) >>>
+--  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
+-- k(g(f(x)),h(f(x)))
+--
+--
+-- >>> simplify $ derivative subexpK xVar :: SimpleExpr
+--  <<< TRACING: Calculating f' of x >>>
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g' of f(x) >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of f(x) >>>
+--  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
+--  <<< TRACING: Calculating h' of f(x) >>>
+--  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
+-- (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
+--
+-- -- >>> simplify $ (derivative (derivative subexpK)) xVar :: SimpleExpr
+--  <<< TRACING: Calculating f' of x >>>
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g' of f(x) >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of f(x) >>>
+--  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
+--  <<< TRACING: Calculating h' of f(x) >>>
+--  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
+-- (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
+--
+-- >>> simplify $ derivative subexpF xVar :: (SimpleExpr, SimpleExpr)
+-- ( <<< TRACING: Calculating f' of x >>>
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g' of f(x) >>>
+-- f'(x)*g'(f(x)), <<< TRACING: Calculating h' of f(x) >>>
+-- f'(x)*h'(f(x)))
+--
+--
+-- >>> import NumHask.Extra (intPow)
+-- >>> import NumHask (log)
+--
+--
+-- >>> -- logF :: (SymbolicFunc a) => a -> a
+-- >>> -- logF x = log (intPow 2 (f x))
+-- >>> -- simplify $ derivative logF xVar :: SimpleExpr
+--
+--

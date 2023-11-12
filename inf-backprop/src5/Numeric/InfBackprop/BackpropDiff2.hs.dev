@@ -1,0 +1,248 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# LANGUAGE DeriveGeneric #-}
+
+module Numeric.InfBackprop.BackpropDiff (
+    BackpropDiff(MkBackpropDiff, value, backprop),
+    initDiff,
+    call,
+    constDiff,
+    derivativeOp,
+    simpleDerivative,
+    DiffOutput,
+    diff,
+    derivative,
+    customDerivative,
+    gradient,
+    customGradient,
+    tupleArg,
+    tupleDerivative,
+) where
+
+
+import Numeric.InfBackprop.Tangent (Tangent, Dual, CT, LongVec, BoxedVec)
+import GHC.Base (id, (.), ($), const, undefined, flip, Type, Maybe(Just, Nothing), fmap, Float, Functor, Applicative, 
+  pure, (<*>))
+import Data.Tuple (fst, snd, uncurry, curry)
+import NumHask ((*), (+), sin, cos, Additive, zero, Multiplicative, one, ExpField, exp, log, (**), sqrt, sin, cos, sinh,
+    asin, acos, cosh, atan, atan2, asinh, acosh, atanh, pi,
+    Subtractive, negate, (-),
+    Divisive, recip, (/), Field, AdditiveAction, (^), (^^), TrigField, two, Distributive, Integral, fromIntegral,
+    FromIntegral
+  )
+import Control.Applicative ((<$>))
+import Data.Type.Equality (type (~))
+import Prelude.Tools (cross, cross3)
+import GHC.Generics (Generic)
+import Data.Primitive (Prim)
+import Debug.Traced (Traced(MkTraced))
+import NumHask.Extra (IntegralPower, integralPow)
+import Data.Proxy (Proxy(Proxy))
+import qualified Data.Stream as DS
+import Debug.SimpleExpr (SimpleExpr)
+import Data.Finite (Finite)
+import GHC.TypeNats (KnownNat)
+import Data.Vector.Generic.Base (Vector(basicUnsafeFreeze, basicUnsafeThaw, basicLength, basicUnsafeSlice, basicUnsafeIndexM))
+import qualified Data.Vector as DV
+import qualified Data.Vector.Unboxed as DVU
+import qualified Data.Vector.Generic.Base as DVGB
+import qualified Data.Vector.Generic.Sized as DVGS
+import qualified Data.Vector.Generic as DVG
+import qualified Data.Vector.Primitive as DVP
+import qualified Data.Vector.Generic.Mutable.Base as DVGBM
+import qualified Data.Vector.Generic.Mutable as DVGM
+import NumHask.Extra (vecBasis)
+import Prelude.Tools (curry3, uncurry3)
+import qualified Data.FiniteList as DF
+import Control.ExtendableMap (ExtandableMap, extendMap)
+import Data.Coerce (coerce)
+import Data.Function (on)
+
+
+data BackpropDiff t a = 
+    MkBackpropDiff {value :: a, backprop :: CT a -> CT t} deriving (Generic)
+
+initDiff :: a -> BackpropDiff a a
+initDiff x = MkBackpropDiff x id
+
+call :: (BackpropDiff a a -> BackpropDiff a b) -> a -> b
+call f = value . f . initDiff
+
+type instance Tangent (BackpropDiff a b) = BackpropDiff a (Tangent b)
+type instance Dual (BackpropDiff a b) = BackpropDiff a (Dual b)
+
+constDiff :: Additive (CT t) => 
+  a -> BackpropDiff t a
+constDiff x = MkBackpropDiff x (const zero)
+
+derivativeOp :: (BackpropDiff a a -> BackpropDiff a b) ->
+  a ->
+  CT b ->
+  CT a
+derivativeOp f = backprop . f . initDiff
+
+
+
+-- | Derivative scalar -> scalar
+simpleDerivative :: forall a b. (Multiplicative (CT b)) =>
+  (BackpropDiff a a -> BackpropDiff a b) ->
+  a ->
+  CT a
+simpleDerivative f x = derivativeOp f x one
+
+
+
+-- class DerivativeWith a where
+--   initBackProp :: a -> CT a
+
+-- instance (DerivativeWith a, Additive (CT t)) =>
+--   DerivativeWith (BackpropDiff t a) where
+--     initBackProp (MkBackpropDiff x _) = constDiff (initBackProp x)
+
+-- instance DerivativeWith Float where
+--   initBackProp = const 1
+
+-- instance DerivativeWith SimpleExpr where
+--   initBackProp = const one
+
+
+-- type GetDerivative a b = a -> b -> DiffOutput a b
+
+class HasDerivative a b | b -> a where
+  type DiffOutput a b :: Type
+  diff :: a -> b -> DiffOutput a b -- GetDerivative a b
+
+-- instance Multiplicative (CT b) =>
+--   HasDerivative (BackpropDiff a a) (BackpropDiff a b) where
+--     type DiffOutput (BackpropDiff a a) (BackpropDiff a b) = CT a
+--     diff :: GetDerivative (BackpropDiff a a) (BackpropDiff a b)
+--     diff = simpleDerivative
+
+-- instance DerivativeWith b =>
+--   HasDerivative a (BackpropDiff a b) where
+--     type DiffOutput a (BackpropDiff a b) = CT a
+--     diff :: a -> BackpropDiff a b -> CT a -- Differentiable a (BackpropDiff a b)
+--     diff _ (MkBackpropDiff y bp) = bp $ initBackProp y
+
+-- instance Multiplicative (CT b) =>
+--   HasDerivative a (BackpropDiff a b) where
+--     type DiffOutput a (BackpropDiff a b) = CT a
+--     diff :: a -> BackpropDiff a b -> CT a 
+--     diff _ (MkBackpropDiff _ bp) = bp one
+
+instance () =>
+  HasDerivative a (BackpropDiff a Float) where
+    type DiffOutput a (BackpropDiff a Float) = CT a
+    diff :: a -> BackpropDiff a Float -> CT a 
+    diff _ (MkBackpropDiff _ bp) = bp 1
+
+instance () =>
+  HasDerivative a (BackpropDiff a (BackpropDiff t b)) where
+    type DiffOutput a (BackpropDiff a (BackpropDiff t b)) = BackpropDiff t (CT a)
+    diff :: a -> BackpropDiff (BackpropDiff t a) b -> BackpropDiff t (CT a)
+    diff _ (MkBackpropDiff x _) = constDiff (initBackProp x)
+
+
+-- | Derivative scalar -> any
+derivative :: HasDerivative a b =>
+  (BackpropDiff a a -> b) ->
+  a ->
+  DiffOutput a b
+-- derivative f x = diff x (f (initDiff x))
+derivative f = simpleDerivative (diff . f)
+
+-- | Derivative specific -> any
+customDerivative :: HasDerivative a b =>
+  (BackpropDiff a a -> c) ->
+  (c -> b) ->
+  a ->
+  DiffOutput a b
+customDerivative arg f = derivative (f . arg)
+
+
+class HasGradient t a c | t c -> a where
+  polymorphicArg :: BackpropDiff t a -> c
+
+instance HasGradient t a (BackpropDiff t a) where
+  polymorphicArg = id
+
+gradient :: forall b c a. (HasGradient a a c, Multiplicative (CT b)) =>
+  (c -> BackpropDiff a b) ->
+  a ->
+  CT a
+gradient f = simpleDerivative (f . polymorphicArg)
+
+customGradient :: (HasGradient a a c, Multiplicative (CT b)) =>
+  (d -> BackpropDiff a b) ->
+  (c -> d) ->
+  a ->
+  CT a
+customGradient v f = gradient (v . f)
+
+
+
+-- * Tuple
+
+tupleArg :: (Additive (CT a0), Additive (CT a1)) =>
+  BackpropDiff t (a0, a1) -> (BackpropDiff t a0, BackpropDiff t a1)
+tupleArg (MkBackpropDiff (x0, x1) bpc) = (
+    MkBackpropDiff x0 (\cy -> bpc (cy, zero)),
+    MkBackpropDiff x1 (\cy -> bpc (zero, cy))
+  )
+
+tupleDerivative :: (HasDerivative (a0, a1) b, Additive (CT a0), Additive (CT a1)) =>
+  ((BackpropDiff (a0, a1) a0, BackpropDiff (a0, a1) a1) -> b) ->
+  (a0, a1) ->
+  DiffOutput (a0, a1) b
+tupleDerivative = customDerivative tupleArg
+
+tupleValue :: Additive (CT t) => 
+  (BackpropDiff t a0, BackpropDiff t a1) -> BackpropDiff t (a0, a1)
+tupleValue (MkBackpropDiff x0 bp0, MkBackpropDiff x1 bp1) = 
+  MkBackpropDiff (x0, x1) (\(cy0, cy1) -> bp0 cy0 + bp1 cy1)
+
+instance (HasDerivative a b0, HasDerivative a b1) =>
+  HasDerivative a (b0, b1) where
+    type DiffOutput a (b0, b1) = (DiffOutput a b0, DiffOutput a b1)
+    diff :: a -> (b0, b1) -> (DiffOutput a b0, DiffOutput a b1) -- GetDerivative a (b0, b1)
+    diff x (y0, y1) = (diff x y0, diff x y1)
+
+
+-- instance (
+--     HasGradient t a0 c0,
+--     HasGradient t a1 c1,
+--     Additive (CT a0),
+--     Additive (CT a1)
+--   ) =>
+--   HasGradient t (a0, a1) (c0, c1) where
+--     anyArg =  cross anyArg anyArg . tupleArg
+
+-- tupleGradient :: () =>
+--   (c -> (BackpropDiff t a0, BackpropDiff t a1)) ->
+--   a ->
+--   (CT (DiffOutput a0), CT (DiffOutput a1))
+-- tupleGradient = customGradient tupleValue
+
+
+-- Triple
+tripleArg :: (Additive (CT a0), Additive (CT a1), Additive (CT a2)) =>
+  BackpropDiff t (a0, a1, a2) -> (BackpropDiff t a0, BackpropDiff t a1, BackpropDiff t a2)
+tripleArg (MkBackpropDiff (x0, x1, x2) bpc) = (
+    MkBackpropDiff x0 (\cy -> bpc (cy, zero, zero)),
+    MkBackpropDiff x1 (\cy -> bpc (zero, cy, zero)),
+    MkBackpropDiff x2 (\cy -> bpc (zero, zero, cy))
+  )
+
+-- instance (
+--     HasGradient t a0 c0,
+--     HasGradient t a1 c1,
+--     HasGradient t a2 c2,
+--     Additive (CT a0),
+--     Additive (CT a1),
+--     Additive (CT a2)
+--   ) =>
+--   HasGradient t (a0, a1, a2) (c0, c1, c2) where
+--     anyArg = cross3 anyArg anyArg anyArg . tripleArg

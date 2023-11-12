@@ -18,5 +18,9 @@ main =
       "-XTupleSections",
       "-XFlexibleContexts",
       "-XDeriveFunctor",
+      "-XBangPatterns",
+      "-XDataKinds",
+      "-XTypeApplications",
+      "-XTypeOperators",
       "src"
     ]

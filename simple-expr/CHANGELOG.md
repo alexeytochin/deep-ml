@@ -1,5 +1,20 @@
 # Revision history for simple-expr
 
+## [0.2.0.0] -- 2025-11-13
+
+### Changed
+
+* Compatibility with `inf-backprop` 0.2.0.0
+* Removed `BinaryFuncF`
+* Switched form `String` to `Text`
+* Instances of `FromIntegral` for `SimpleExpr` type.
+
+## [0.1.1.0] -- 2023-08-05
+
+### Fixed
+
+* Compatibility up to LTS 21.6
+
 ## [0.1.0.0] -- 2023-05-12
 
 ### Added
@@ -9,8 +24,3 @@
 * Visualization provided by `graphviz`.
 * Tutorial
 
-## [0.1.1.0] -- 2023-08-05
-
-### Fixed
-
-* Compatibility up to LTS 21.6

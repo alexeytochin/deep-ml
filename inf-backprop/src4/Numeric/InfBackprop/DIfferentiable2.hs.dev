@@ -1,0 +1,342 @@
+--{-# LANGUAGE UndecidableInstances #-}
+
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeApplications #-}
+
+module Numeric.InfBackprop.DIfferentiable2 where
+
+import Data.Type.Equality (type (~))
+import GHC.Base (flip)
+import Data.Finite (Finite)
+import GHC.Base (Type, const, undefined, id, (.), ($), (==), fmap)
+import Numeric.InfBackprop.DFunc2 (DFunc(MkDFunc), identity, pullback, derivativeOp)
+import NumHask (Multiplicative, one, Additive, zero)
+import Numeric.InfBackprop.Tangent (CT)
+import Numeric.InfBackprop.DLens (LongVec)
+import GHC.TypeNats (KnownNat)
+import Prelude.Tools (cross, fork)
+import qualified Data.Vector.Generic.Sized as DVGS
+import qualified Data.Vector.Generic as DVG
+import qualified Data.Vector as DV
+import qualified Data.Vector.Fixed.Boxed as DVFB
+import qualified Data.Vector.Fixed as DVF
+import Data.Tuple (curry, uncurry)
+
+
+--class DifferentiableArg a where
+--  type GetT a :: Type
+--  type GetA a :: Type
+--  fromLens :: DLens (CT (GetT a)) (GetT a) (CT (GetA a)) (GetA a) -> a
+--
+--instance (CT a ~ ca, CT t ~ ct) => DifferentiableArg (DLens ct t ca a) where
+--  type GetT (DLens ct t ca a) = t
+--  type GetA (DLens ct t ca a) = a
+--  fromLens = id
+
+
+--instance (
+--    DifferentiableArg a0,
+--    DifferentiableArg a1,
+--    GetT a0 ~ GetT a1,
+--    Additive (CT (GetA a0)),
+--    Additive (CT (GetA a1))
+--  ) => DifferentiableArg (a0, a1) where
+--  type GetT (a0, a1) = GetT a0
+--  type GetA (a0, a1) = (GetA a0, GetA a1)
+--  fromLens :: DLens (CT (GetT (a0, a1))) (GetT (a0, a1)) (CT (GetA (a0, a1))) (GetA (a0, a1)) -> (a0, a1)
+--  fromLens = cross fromLens fromLens . lensToTuple
+
+
+class DifferentiableArg a where
+--  type GetT a :: Type
+--  type GetA a :: Type
+  -- init :: a
+  -- type FormLens a :: Type
+--  fromLens :: FormLens a -> a
+  type GetArg a :: Type
+  type GetA a :: Type
+  type GetT a :: Type
+  fromLens :: DFunc (GetT a) (GetA a) -> a
+
+class InitBackprop a where
+  init :: a
+
+instance -- () =>
+  DifferentiableArg (DFunc a a) where
+--  type GetT (DLens ct t ca a) = t
+--  type GetA (DLens ct t ca a) = a
+  --type FormLens (DFunc a a) = (DFunc a a)
+  type GetArg (DFunc a a) = a
+  type GetA (DFunc a a) = a 
+  type GetT (DFunc a a) = a 
+  fromLens :: DFunc a a -> DFunc a a
+  fromLens = id
+--  init :: DFunc a a
+--  init = identity
+
+instance InitBackprop (DFunc a a) where
+  init = identity
+
+
+dFst :: Additive (CT b) => DFunc (a, b) a
+dFst = MkDFunc $ \(x, _) -> (x, (, zero))
+
+dSnd :: Additive (CT a) => DFunc (a, b) b
+dSnd = MkDFunc $ \(_, y) -> (y, (zero,))
+
+lensToTuple :: (Additive (CT a0), Additive (CT a1)) =>
+  DFunc t (a0, a1) -> (DFunc t a0, DFunc t a1)
+lensToTuple (MkDFunc d) = (MkDFunc d0, MkDFunc d1) where
+  d0 = \t -> let
+      ((x0, _), dxt) = d t
+    in (x0, \dx0 -> dxt (dx0, zero))
+  d1 = \t -> let
+      ((_, x1), dxt) = d t
+    in (x1, \dx1 -> dxt (zero, dx1))
+
+--lensToTuple :: (Additive dx0, Additive dx1) =>
+--  DLens (ca0, ca1) (a0, a1) (ca0, ca1) (a0, a1) -> (DLens (ca0, ca1) (a0, a1) ca0 a0, DLens (ca0, ca1) (a0, a1) ca1 a1)
+--lensToTuple (MkDLens d) =
+
+  --instance (Additive ca0, Additive ca1) =>
+--  DifferentiableArg2 (DLens (ca0, ca1) (a0, a1) ca0 a0, DLens (ca0, ca1) (a0, a1) ca1 a1) where
+--    init :: (DLens (ca0, ca1) (a0, a1) ca0 a0, DLens (ca0, ca1) (a0, a1) ca1 a1)
+--    init = (dFst, dSnd)
+
+--instance (Additive (CT a0), Additive (CT a1)) =>
+--  DifferentiableArg (DFunc t a0, DFunc t a1) where
+--    type GetA (DFunc t a0, DFunc t a1) = (a0, a1)
+--    type GetT (DFunc t a0, DFunc t a1) = t
+--    fromLens :: DFunc t (a0, a1) -> (DFunc t a0, DFunc t a1)
+--    fromLens = lensToTuple
+instance (Additive (CT a0), Additive (CT a1)) =>
+  DifferentiableArg (DFunc t a0, DFunc t a1) where
+    type GetArg (DFunc t a0, DFunc t a1) = (GetArg a0, GetArg a1)
+    type GetA (DFunc t a0, DFunc t a1) = (a0, a1)
+    type GetT (DFunc t a0, DFunc t a1) = t
+    fromLens :: DFunc t (a0, a1) -> (DFunc t a0, DFunc t a1)
+    fromLens = lensToTuple
+--    init :: (DFunc t a0, DFunc t a1)
+--    init = 
+
+instance (InitBackprop a0, InitBackprop a1) =>
+  InitBackprop (DFunc (a0, a1) a0, DFunc (a0, a1) a1) where
+    init = undefined -- cross init init . lensToTuple
+
+
+longVecBasis :: (DVG.Vector v a, KnownNat n) =>
+  Finite n -> a -> a -> DVGS.Vector v n a
+longVecBasis k zero' one' = DVGS.generate $ \l ->
+  if k == l
+    then one'
+    else zero'
+
+lensToLongVec :: forall t a n. (Additive (CT a), KnownNat n) =>
+  DFunc t (LongVec n a) -> LongVec n (DFunc t a)
+lensToLongVec (MkDFunc d) = DVGS.generate $ \k ->
+  MkDFunc $ \t -> let
+      (v, dvt) = d t :: (LongVec n a, LongVec n (CT a) -> CT t)
+    in (DVGS.index v k, dvt . longVecBasis k zero) :: (a, CT a -> CT t)
+
+--instance (KnownNat n, Additive (CT a)) =>
+--  DifferentiableArg (LongVec n (DFunc t a)) where
+----    init :: LongVec n (DLens (LongVec n ca) (LongVec n a) ca a)
+----    init = DVGS.generate $ \k -> MkDLens $ \vec -> (DVGS.index vec k, undefined)
+--    --type FormLens (LongVec n (DFunc t a)) = DFunc t (LongVec n a)
+--    type GetA (LongVec n (DFunc t a)) = LongVec n a
+--    type GetT (LongVec n (DFunc t a)) = t
+--    fromLens :: DFunc t (LongVec n a) -> LongVec n (DFunc t a)
+--    fromLens = lensToLongVec
+instance (KnownNat n, Additive (CT a)) =>
+  DifferentiableArg (LongVec n (DFunc t a)) where
+--    init :: LongVec n (DLens (LongVec n ca) (LongVec n a) ca a)
+--    init = DVGS.generate $ \k -> MkDLens $ \vec -> (DVGS.index vec k, undefined)
+    --type FormLens (LongVec n (DFunc t a)) = DFunc t (LongVec n a)
+    type GetArg (LongVec n (DFunc t a)) = LongVec n (GetArg a)
+    type GetA (LongVec n (DFunc t a)) = LongVec n a
+    type GetT (LongVec n (DFunc t a)) = t
+    fromLens :: DFunc t (LongVec n a) -> LongVec n (DFunc t a)
+    fromLens = lensToLongVec
+
+
+--instance (Additive ca0, Additive ca1) =>
+--  DifferentiableArg2 (
+--      LongVec n0 (DLens () () ca1 a1),
+--      LongVec n1 ( ca1 a1)
+----      DLens (LongVec n0 ca0, LongVec n1 ca1) (LongVec n0 ca0, LongVec n1 ca1) (LongVec n0 ca0) (LongVec n0 a0),
+----      DLens (LongVec n0 ca0, LongVec n1 ca1) (LongVec n0 ca0, LongVec n1 ca1) (LongVec n1 ca1) (LongVec n1 a1)
+--    ) where
+--    init = (dFst, dSnd)
+
+
+class DifferentiableVal a t where
+  type Val t a :: Type
+  lensDerivative :: a -> t -> Val t a
+  lensDerivative2 :: t -> a -> Val t a
+
+type Differentiable t a = a -> t -> Val t a
+
+initBackProp :: forall a t. t -> DFunc t a -> CT t
+initBackProp x lens = pullback lens (const one) x
+ 
+--sLens :: (CT x ~ DFunc t a, Multiplicative (CT a)) => DFunc t x
+--sLens = MkDFunc $ \x -> ()
+ 
+instance (Multiplicative (CT a)) =>
+  DifferentiableVal (DFunc t a) t where
+    type Val t (DFunc t a) = CT t
+    lensDerivative :: DFunc t a -> t -> CT t
+    lensDerivative lens = pullback lens (const one)
+    lensDerivative2 :: t -> DFunc t a -> CT t
+    lensDerivative2 = initBackProp
+
+
+--temp :: ((a0 -> t -> Val t a0), (a1 -> t -> Val t a1)) -> (a0, a1) -> t -> (Val t a0, Val t a1)
+--tupleVal :: (a0 -> t -> Val t a0) -> (a1 -> t -> Val t a1) -> (a0, a1) -> t -> (Val t a0, Val t a1)
+tupleVal :: Differentiable t a0 -> Differentiable t a1 -> Differentiable t (a0, a1)
+tupleVal f0 f1 (y0, y1) = fork (f0 y0) (f1 y1)
+--tupleVal f0 f1 = \(y0, y1) -> fork (f0 y0) (f1 y1)
+
+tupleVal2 :: (t -> a0 -> Val t a0) -> (t -> a1 -> Val t a1) -> t -> (a0, a1) -> (Val t a0, Val t a1)
+--tupleVal2 :: Differentiable t a0 -> Differentiable t a1 -> Differentiable t (a0, a1)
+tupleVal2 f0 f1 = uncurry cross . fork f0 f1
+--tupleVal2 = uncurry cross . (fork $)
+
+instance (DifferentiableVal a0 t, DifferentiableVal a1 t) =>
+  DifferentiableVal (a0, a1) t where
+    type Val t (a0, a1) = (Val t a0, Val t a1)
+    lensDerivative :: (a0, a1) -> t -> (Val t a0, Val t a1)
+    lensDerivative (d0, d1) x = (lensDerivative d0 x, lensDerivative d1 x)
+    --lensDerivative tuple x = tupleVal (flip lensDerivative x, flip lensDerivative x) tuple
+    lensDerivative2 :: t -> (a0, a1) -> (Val t a0, Val t a1)
+--    lensDerivative2 x = tupleVal (lensDerivative2 x, lensDerivative2 x)
+    lensDerivative2 = uncurry cross . fork lensDerivative2 lensDerivative2
+    --lensDerivative2 = tupleVal . (lensDerivative2, lensDerivative2)
+
+
+--longVecVal :: (a -> t -> Val t a) -> LongVec n a -> t -> LongVec n (Val t a)
+longVecVal :: Differentiable t a -> Differentiable t (LongVec n a)
+-- longVecVal :: forall a t n. (a -> Val t a) -> LongVec n a -> LongVec n (Val t a)
+--longVecVal f y x = fmap (`f` x) y 
+longVecVal = flip . (.) fmap . flip
+
+longVecVal2 :: (t -> a -> Val t a) -> t -> LongVec n a -> LongVec n (Val t a)
+longVecVal2 = (.) fmap
+
+longVecVal2_ :: t -> LongVec n (DFunc t a) -> LongVec n (CT t)
+longVecVal2_ = longVecVal2 initBackProp
+
+longVecValN :: proxy n -> (a -> b) -> LongVec n a -> LongVec n b
+longVecValN _ = fmap
+
+longVecLongVecVal :: (a -> b) -> LongVec n (LongVec m a) -> LongVec n (LongVec m b)
+longVecLongVecVal = fmap . fmap
+
+
+instance (DifferentiableVal a t) =>
+  DifferentiableVal (LongVec n a) t where
+    type Val t (LongVec n a) = LongVec n (Val t a)
+    lensDerivative :: LongVec n a -> t -> LongVec n (Val t a)
+    lensDerivative vec x = fmap (`lensDerivative` x) vec
+    -- lensDerivative vec x = longVecVal (`lensDerivative` x) vec
+    lensDerivative2 :: t -> LongVec n a -> LongVec n (Val t a)
+--    lensDerivative2 x = longVecVal (lensDerivative2 x)
+    lensDerivative2 = (longVecVal :: (a -> Val t a) -> LongVec n a -> LongVec n (Val t a)) . lensDerivative2
+
+--longVecTupleVal :: (a -> b) -> LongVec n a -> LongVec n b
+
+
+longVecTupleVal :: Differentiable t a0 -> Differentiable t a1 -> Differentiable t (LongVec n0 a0, LongVec n1 a1)
+longVecTupleVal d0 d1 = tupleVal (longVecVal d0) (longVecVal d1) 
+
+longVecTupleVal_ :: (Differentiable t a0, Differentiable t a1) -> Differentiable t (LongVec n0 a0, LongVec n1 a1)
+longVecTupleVal_ = uncurry tupleVal . cross longVecVal longVecVal
+
+
+lensDerivative2_ :: forall a0 n0 a1 n1 t. (DifferentiableVal a0 t, DifferentiableVal a1 t) =>
+  t -> (LongVec n0 a0, LongVec n1 a1) -> (Val t (LongVec n0 a0), Val t (LongVec n1 a1))
+--lensDerivative2_ x = uncurry cross (longVecVal (lensDerivative2 x), longVecVal (lensDerivative2 x))
+--lensDerivative2_ x = uncurry cross (fork (longVecVal . lensDerivative2) (longVecVal . lensDerivative2) x)
+lensDerivative2_ = uncurry cross . fork 
+  ((longVecVal . lensDerivative2) :: t -> LongVec n0 a0 -> Val t (LongVec n0 a0)) 
+  (longVecVal . lensDerivative2)
+--lensDerivative2_ = uncurry cross . fork longVecVal longVecVal . lensDerivative2
+
+
+--longVecVal2_ :: t -> LongVec n (DFunc t a) -> LongVec n (CT t)
+--longVecVal2_ = longVecVal2 initBackProp
+tupleLongVecVal :: forall a0 n0 a1 n1 t.
+  t -> (LongVec n0 (DFunc t a0), LongVec n1 (DFunc t a1)) -> (LongVec n0 (CT t), LongVec n1 (CT t))
+tupleLongVecVal = tupleVal2 (longVecVal2 initBackProp) (longVecVal2 initBackProp)
+
+-- GetArg (DFunc a a) = a 
+-- GetArg (DFunc a a, DFunc a a) = (a, a)
+-- GetArg (LongVec n DFunc a a) = LongVec n a
+-- GetArg (LongVec n0 DFunc a a, LongVec n1 DFunc a a) = (LongVec n0 a, LongVec n1 a)
+
+-- DFunc (GetArg a) (GetArg a)
+
+derivative :: (DifferentiableVal b (GetArg a)) =>
+  (a -> b) -> (DFunc (GetArg a) (GetArg a) -> a) -> GetArg a -> Val (GetArg a) b
+derivative f arg = lensDerivative ((f . arg) identity)
+
+simpleDerivative :: DifferentiableVal b a => (DFunc a a -> b) -> a -> Val a b
+--simpleDerivative f = lensDerivative (f identity)
+simpleDerivative f = derivative f id
+
+-- b = DFunc (GetArg a) a1
+gradient :: (Multiplicative (CT b)) =>
+  (a -> DFunc (GetArg a) b) -> (DFunc (GetArg a) (GetArg a) -> a) -> GetArg a -> CT (GetArg a) --Val (GetArg a) (DFunc (GetArg a) b)
+gradient = derivative
+
+gradientAuto :: (Multiplicative (CT b), DifferentiableArg a) =>
+  (a -> DFunc (GetArg a) b) -> GetArg a -> CT (GetArg a) --Val (GetArg a) (DFunc (GetArg a) b)
+gradientAuto f = derivative f fromLens
+
+
+
+
+
+--class DifferentiableArg (a0, a1) where
+--  fromLens :: Lens ct t () (a0, a1) -> (a0, a1)
+
+
+
+--class Differentiable a b where
+--  type Arg a b :: Type
+--  type Val a b :: Type
+--  derivative_ :: (a -> b) -> Arg a b -> Val a b
+--
+--instance Multiplicative cb =>
+--  Differentiable (DLens ct t ca a) (DLens ct t cb b) where
+--    type Arg (DLens ct t ca a) (DLens ct t cb b) = a
+--    type Val (DLens ct t ca a) (DLens ct t cb b) = ca
+--    derivative_ :: (DLens ct t ca a -> DLens ct t cb b) -> a -> ca
+--    derivative_ f = pullback (f identity) (const one)
+----    derivative_1 :: DLens ca t cb b -> a -> ca
+----    derivative_1 f = pullback (f identity) (const one)
+--
+--instance (
+--    Differentiable a0 b,
+--    Differentiable a1 b,
+--    Arg a0 b ~ Arg a1 b
+--  ) =>
+--  Differentiable (a0, a1) b where
+--    type Arg (a0, a1) b = Arg a0 b
+--    type Val (a0, a1) b = (Val a0 b, Val a1 b)
+--    derivative_ :: ((a0, a1) -> b) -> Arg a0 b -> (Val a0 b, Val a1 b)
+--    derivative_ f
+
+
+--instance (
+--    Differentiable a b0,
+--    Differentiable a b1,
+--    Arg a b0 ~ Arg a b1
+--  ) =>
+--  Differentiable a (b0, b1) where
+--    type Arg a (b0, b1) = Arg a b0
+--    type Val a (b0, b1) = (Val a b0, Val a b1)
+--    derivative_ :: (a -> (b0, b1)) -> Arg a b0 -> (Val a b0, Val a b1)
+--    derivative_ f = let
+--        (y0, y1) =
+--      in ( )

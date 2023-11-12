@@ -1,4 +1,8 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wcpp-undef #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -15,12 +19,14 @@ module Debug.SimpleExpr.Expr
     variable,
     unaryFunc,
     binaryFunc,
-    simplify,
+    simplifyExpr,
     simplifyStep,
+    simplify,
 
     -- * Base types
-    SimpleExprF (NumberF, VariableF, BinaryFuncF, SymbolicFuncF),
+    SimpleExprF (NumberF, VariableF, SymbolicFuncF),
     SimpleExpr,
+    SE,
     Expr,
 
     -- * Auxiliary functions
@@ -31,54 +37,88 @@ module Debug.SimpleExpr.Expr
   )
 where
 
+import Control.ExtendableMap (ExtandableMap, extendMap)
+import Control.Monad (guard)
 import Control.Monad.Fix (fix)
 import Data.Fix (Fix (Fix, unFix))
 import Data.Functor.Classes (Eq1, liftEq)
-import Data.List (intercalate, (++))
-import NumHask (Additive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, one, zero)
-import qualified NumHask as NH
-import Prelude
-  ( Bool (False),
-    Eq,
-    Functor,
-    Integer,
-    Num,
-    Show,
+import Data.Hashable (Hashable(hashWithSalt))
+import Data.Hashable.Lifted (Hashable1(liftHashWithSalt))
+import Data.Hashable.Generic (genericLiftHashWithSalt)
+import Data.List (intercalate, null, uncons, unsnoc, (++))
+import Data.Maybe (isJust)
+import GHC.Base
+  ( Applicative (pure),
+    Bool(False),
+    Eq ((==)),
+    Functor (fmap),
+    Maybe (Just, Nothing),
     String,
-    fmap,
+    not,
     seq,
-    show,
     ($),
     (&&),
     (.),
     (<>),
-    (==),
+    (>=)
   )
+import GHC.Generics (Generic1)
+import GHC.Natural (Natural)
+import GHC.Num (Num)
+import GHC.Show (Show (show))
+import NumHask
+  ( Additive,
+    Divisive,
+    ExpField,
+    FromInteger,
+    Multiplicative,
+    Subtractive,
+    TrigField,
+    fromIntegral,
+    one,
+    zero,
+  )
+import qualified NumHask as NH
 import qualified Prelude as P
 
 -- | Expression F-algebra functional.
 data SimpleExprF a
-  = NumberF Integer
+  = NumberF Natural
   | VariableF String
-  | BinaryFuncF String a a
   | SymbolicFuncF String [a]
-  deriving (Functor, Eq)
+  deriving (Functor, Eq, Generic1)
 
+instance Hashable1 SimpleExprF where
+  liftHashWithSalt = genericLiftHashWithSalt
+
+instance Hashable a => Hashable (SimpleExprF a) where
+  hashWithSalt salt (NumberF n) = hashWithSalt salt n
+  hashWithSalt salt (VariableF s) = hashWithSalt salt s
+  hashWithSalt salt (SymbolicFuncF name xs) =
+    salt `hashWithSalt` name `hashWithSalt` xs
+
+-- | Equality comparison for `SimpleExprF` lifted over its parameter.
 instance Eq1 SimpleExprF where
   liftEq :: (a -> b -> Bool) -> SimpleExprF a -> SimpleExprF b -> Bool
   liftEq eq e1 e2 = case (e1, e2) of
     (NumberF n1, NumberF n2) -> n1 == n2
     (VariableF v1, VariableF v2) -> v1 == v2
-    (BinaryFuncF name1 x1 y1, BinaryFuncF name2 x2 y2) -> (name1 == name2) && eq x1 x2 && eq y1 y2
     (SymbolicFuncF name1 args1, SymbolicFuncF name2 args2) -> (name1 == name2) && liftEq eq args1 args2
     _ -> False
 
-instance NH.FromIntegral (SimpleExprF a) Integer where
-  fromIntegral = NumberF
+-- | `SimpleExprF` instance of `NumHask.FromIntegral` typeclass.
+instance
+  (NH.FromIntegral Natural n) =>
+  NH.FromIntegral (SimpleExprF a) n
+  where
+  fromIntegral = NumberF . fromIntegral
 
 -- | Simple expression type, see
 -- [tutorial](Debug.SimpleExpr.Tutorial.hs)
 type SimpleExpr = Fix SimpleExprF
+
+-- | Short type alias for `SimpleExpr`.
+type SE = SimpleExpr
 
 -- | Initializes a single integer number expression.
 --
@@ -89,7 +129,7 @@ type SimpleExpr = Fix SimpleExprF
 -- 42
 -- >>> :t a
 -- a :: SimpleExpr
-number :: Integer -> SimpleExpr
+number :: Natural -> SimpleExpr
 number n = Fix (NumberF n)
 
 -- | Initializes a single symbolic variable expression.
@@ -112,16 +152,19 @@ variable name = Fix (VariableF name)
 -- >>> import NumHask ((+), (*))
 --
 -- >>> dependencies (variable "x" + (variable "y" * variable "z"))
--- [x,y·z]
+-- [x,y*z]
 dependencies :: SimpleExpr -> [SimpleExpr]
 dependencies (Fix e) = case e of
   NumberF _ -> []
   VariableF _ -> []
-  BinaryFuncF _ leftArg rightArg -> [leftArg, rightArg]
   SymbolicFuncF _ args -> args
 
-instance NH.FromIntegral (Fix SimpleExprF) Integer where
-  fromIntegral = Fix . NumberF
+-- | `SimpleExpr` instance of `NumHask.FromIntegral` typeclass.
+instance
+  (NH.FromIntegral Natural n) =>
+  NH.FromIntegral SimpleExpr n
+  where
+  fromIntegral = number . fromIntegral
 
 -- | Entity that is representable as a list of in general other entities.
 -- In particular, @X@ is a list of single @[X]@, see the example below.
@@ -143,30 +186,43 @@ class ListOf inner outer where
   -- | Returns a list of entities the argument consists of.
   content :: outer -> [inner]
 
+-- | Base case instance of `ListOf`.
 instance ListOf inner () where
   content = P.const []
 
+-- | Identity instance of `ListOf`.
 instance ListOf inner inner where
   content e = [e]
 
-instance (ListOf inner outer1, ListOf inner outer2) => ListOf inner (outer1, outer2) where
+-- | Tuple instance of `ListOf`.
+instance
+  (ListOf inner outer1, ListOf inner outer2) =>
+  ListOf inner (outer1, outer2)
+  where
   content (x1, x2) = content x1 ++ content x2
 
-instance (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3) => ListOf inner (outer1, outer2, outer3) where
+-- | Triple instance of `ListOf`.
+instance
+  (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3) =>
+  ListOf inner (outer1, outer2, outer3)
+  where
   content (x1, x2, x3) = content x1 ++ content x2 ++ content x3
 
+-- | 4-tuple instance of `ListOf`.
 instance
   (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3, ListOf inner outer4) =>
   ListOf inner (outer1, outer2, outer3, outer4)
   where
   content (x1, x2, x3, x4) = content x1 ++ content x2 ++ content x3 ++ content x4
 
+-- | 5-tuple instance of `ListOf`.
 instance
   (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3, ListOf inner outer4, ListOf inner outer5) =>
   ListOf inner (outer1, outer2, outer3, outer4, outer5)
   where
   content (x1, x2, x3, x4, x5) = content x1 ++ content x2 ++ content x3 ++ content x4 ++ content x5
 
+-- | List `[]` instance of `ListOf`.
 instance (ListOf inner outer) => ListOf inner [outer] where
   content = (content P.=<<)
 
@@ -174,20 +230,36 @@ instance (ListOf inner outer) => ListOf inner [outer] where
 -- It includes `SimpleExpr` as well as list and tuples of `SimpleExpr` etc.
 type Expr = ListOf SimpleExpr
 
+-- | `SimpleExpr` instance of `Show` typeclass.
 instance {-# OVERLAPPING #-} Show SimpleExpr where
   show (Fix e) = case e of
     NumberF n -> show n
     VariableF name -> name
-    BinaryFuncF name leftArg rightArg -> showWithBrackets leftArg <> name <> showWithBrackets rightArg
-    SymbolicFuncF name args -> name <> "(" <> intercalate "," (fmap show args) <> ")"
+    sf@(SymbolicFuncF name args) -> case matchBinnaryFuncPattern (Fix sf) of
+      Just (name', leftArg, rightArg) -> showWithBrackets leftArg <> name' <> showWithBrackets rightArg
+      Nothing -> name <> "(" <> intercalate "," (fmap show args) <> ")"
+
+-- | Checks whether expression needs brackets in a context like binary function argument.
+needBrackets :: SimpleExpr -> Bool
+needBrackets = isJust . matchBinnaryFuncPattern
 
 -- | Shows expression adding brackets if it is needed for a context.
 showWithBrackets :: SimpleExpr -> String
-showWithBrackets e = case e of
-  n@(Fix NumberF {}) -> show n
-  c@(Fix VariableF {}) -> show c
-  bf@(Fix BinaryFuncF {}) -> "(" <> show bf <> ")"
-  sf@(Fix SymbolicFuncF {}) -> show sf
+showWithBrackets e =
+  if needBrackets e
+    then "(" <> show e <> ")"
+    else show e
+
+-- | Matches binary function pattern.
+matchBinnaryFuncPattern :: SimpleExpr -> Maybe (String, SimpleExpr, SimpleExpr)
+matchBinnaryFuncPattern (Fix (SymbolicFuncF name [x, y])) = do
+  (first, rest1) <- uncons name
+  (body, lastCh) <- unsnoc rest1
+  guard $ first == '('
+  guard $ lastCh == ')'
+  guard $ not (null body)
+  pure (body, x, y)
+matchBinnaryFuncPattern _ = Nothing
 
 -- | Inituialize unarry function
 --
@@ -220,25 +292,36 @@ unaryFunc name x = Fix (SymbolicFuncF name [x])
 -- >>> :t x-*-y
 -- x-*-y :: SimpleExpr
 binaryFunc :: String -> SimpleExpr -> SimpleExpr -> SimpleExpr
-binaryFunc name x y = Fix (BinaryFuncF name x y)
+binaryFunc name x y = Fix $ SymbolicFuncF ("(" <> name <> ")") [x, y]
 
+-- | `SimpleExpr` instance of `NumHask.FromInteger` typeclass.
+instance FromInteger SimpleExpr where
+  fromInteger n =
+    if n >= 0
+      then number $ fromIntegral n
+      else NH.negate $ number $ fromIntegral $ P.abs n
+
+-- | `SimpleExpr` instance of `NumHask.Additive` typeclass.
 instance Additive SimpleExpr where
   zero = number 0
   (+) = binaryFunc "+"
 
+-- | `SimpleExpr` instance of `NumHask.Subtractive` typeclass.
 instance Subtractive SimpleExpr where
   negate = unaryFunc "-"
   (-) = binaryFunc "-"
 
+-- | `SimpleExpr` instance of `NumHask.Multiplicative` typeclass.
 instance Multiplicative SimpleExpr where
   one = number 1
-  (*) = binaryFunc "·"
+  (*) = binaryFunc "*"
 
 #if MIN_VERSION_numhask(0,11,0)
 #else
 instance NH.Distributive SimpleExpr
 #endif
 
+-- | `SimpleExpr` instance of `NumHask.Divisive` typeclass.
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
 
@@ -247,14 +330,16 @@ instance Divisive SimpleExpr where
 instance NH.Field SimpleExpr
 #endif
 
+-- | `SimpleExpr` instance of `NumHask.ExpField` typeclass.
 instance ExpField SimpleExpr where
   exp = unaryFunc "exp"
   log = unaryFunc "log"
   (**) = binaryFunc "^"
   sqrt = unaryFunc "sqrt"
 
+-- | `SimpleExpr` instance of `NumHask.TrigField` typeclass.
 instance TrigField SimpleExpr where
-  pi = variable "π"
+  pi = variable "pi"
   sin = unaryFunc "sin"
   cos = unaryFunc "cos"
   tan = unaryFunc "tg"
@@ -269,6 +354,27 @@ instance TrigField SimpleExpr where
   acosh = unaryFunc "arcch"
   atanh = unaryFunc "arcth"
 
+-- | Numeric typeclass instance for `SimpleExpr`.
+--
+-- This instance enables standard numeric operations on symbolic expressions,
+-- allowing for more natural mathematical notation in symbolic computations.
+--
+-- ==== __Examples of usage__
+--
+-- >>> import GHC.Num ((+))
+--
+-- The primary benefit of this instance is enabling direct use of numeric
+-- literals in symbolic expressions without explicit conversion. This allows
+-- you to write natural mathematical expressions:
+--
+-- >>> x = variable "x"
+-- >>> x + 1
+-- x+1
+--
+-- This concise notation is equivalent to the more verbose explicit form:
+--
+-- >>> x + (number 1)
+-- x+1
 instance Num SimpleExpr where
   (+) = (NH.+)
   (-) = (NH.-)
@@ -276,7 +382,7 @@ instance Num SimpleExpr where
   negate = NH.negate
   abs = unaryFunc "abs"
   signum = unaryFunc "sign"
-  fromInteger = number
+  fromInteger = fromIntegral
 
 -- | Applies a function recursivelly until it has no effect.
 -- Strict.
@@ -287,7 +393,7 @@ instance Num SimpleExpr where
 -- >>> import Prelude (Integer, div)
 -- >>> iterateUntilEqual (`div` 2) (1000 :: Integer)
 -- 0
-iterateUntilEqual :: Eq x => (x -> x) -> x -> x
+iterateUntilEqual :: (Eq x) => (x -> x) -> x -> x
 iterateUntilEqual f x =
   let fx = f x
    in if fx == x
@@ -310,41 +416,55 @@ simplifyStep :: (SimpleExpr -> SimpleExpr) -> SimpleExpr -> SimpleExpr
 simplifyStep f e = case e of
   n@(Fix (NumberF _)) -> n
   c@(Fix (VariableF _)) -> c
-  Fix (BinaryFuncF name leftArg rightArg) -> case name of
-    "+" -> case (unFix leftArg, unFix rightArg) of
+  Fix (SymbolicFuncF name [arg]) -> case name of
+    "-" -> case unFix (f arg) of
+      NumberF 0 -> Fix $ NumberF 0
+      SymbolicFuncF "-" [arg'] -> f arg'
+      SymbolicFuncF "(-)" [leftArg, rightArg] -> Fix $ SymbolicFuncF "(-)" [f rightArg, f leftArg]
+      _ -> Fix $ SymbolicFuncF "-" [f arg]
+    _ -> Fix $ SymbolicFuncF name [f arg]
+  Fix (SymbolicFuncF name [leftArg, rightArg]) -> case name of
+    "(+)" -> case (unFix leftArg, unFix rightArg) of
       (NumberF 0, _) -> f rightArg
       (_, NumberF 0) -> f leftArg
       (NumberF n, NumberF m) -> Fix (NumberF (n P.+ m))
-      _ -> Fix (BinaryFuncF "+" (f leftArg) (f rightArg))
-    "-" -> case (unFix leftArg, unFix rightArg) of
+      _ -> Fix (SymbolicFuncF "(+)" [f leftArg, f rightArg])
+    "(-)" -> case (unFix leftArg, unFix rightArg) of
       (NumberF 0, _) -> NH.negate f rightArg
       (_, NumberF 0) -> f leftArg
       (NumberF n, NumberF m) -> Fix (NumberF (n P.- m))
       _ ->
         if fX == fY
           then zero
-          else Fix (BinaryFuncF "-" fX fY)
+          else Fix (SymbolicFuncF "(-)" [fX, fY])
         where
           fX = f leftArg
           fY = f rightArg
-    "·" -> case (unFix leftArg, unFix rightArg) of
+    "(*)" -> case (unFix leftArg, unFix rightArg) of
       (NumberF 0, _) -> zero
       (_, NumberF 0) -> zero
       (NumberF 1, _) -> f rightArg
       (_, NumberF 1) -> f leftArg
       (NumberF n, NumberF m) -> Fix (NumberF (n P.* m))
-      _ -> Fix (BinaryFuncF "·" (f leftArg) (f rightArg))
-    "^" -> case (unFix leftArg, unFix rightArg) of
+      (SymbolicFuncF "-" [leftArg'], SymbolicFuncF "-" [rightArg']) ->
+        Fix $ SymbolicFuncF "(*)" [f leftArg', f rightArg']
+      (SymbolicFuncF "-" [leftArg'], rightArg') ->
+        Fix $ SymbolicFuncF "-" [Fix $ SymbolicFuncF "(*)" [leftArg', Fix rightArg']]
+      (leftArg', SymbolicFuncF "-" [rightArg']) ->
+        Fix $ SymbolicFuncF "-" [Fix $ SymbolicFuncF "(*)" [Fix leftArg', rightArg']]
+      _ -> Fix (SymbolicFuncF "(*)" [f leftArg, f rightArg])
+    "(^)" -> case (unFix leftArg, unFix rightArg) of
       (NumberF n, NumberF m) -> Fix (NumberF (n P.^ m))
       (NumberF 0, _) -> zero
       (_, NumberF 0) -> one
       (NumberF 1, _) -> one
       (_, NumberF 1) -> f leftArg
-      _ -> Fix (BinaryFuncF "^" (f leftArg) (f rightArg))
-    _ -> Fix (BinaryFuncF name (f leftArg) (f rightArg))
+      _ -> Fix (SymbolicFuncF "(^)" [f leftArg, f rightArg])
+    _ -> Fix (SymbolicFuncF name [f leftArg, f rightArg])
   Fix (SymbolicFuncF name args) -> Fix (SymbolicFuncF name (fmap f args))
 
--- | Simplify expression using some primitive rules like '0 * x -> 0' specified in 'simplifyStep' implementation.
+-- | Simplify expression using some primitive rules
+-- like '0 * x -> 0' specified in 'simplifyStep' implementation.
 --
 -- ==== __Examples of usage__
 --
@@ -353,7 +473,12 @@ simplifyStep f e = case e of
 -- >>> import NumHask ((+), (-), (*))
 --
 -- >>> x = variable "x"
--- >>> simplify $ (x + 0) * 1 - x * (3 - 2)
+-- >>> simplifyExpr $ (x + 0) * 1 - x * (3 - 2)
 -- 0
-simplify :: SimpleExpr -> SimpleExpr
-simplify = fix $ iterateUntilEqual . simplifyStep -- simplify = iterateUntilEqual (simplifyStep simplify)
+simplifyExpr :: SimpleExpr -> SimpleExpr
+simplifyExpr = fix $ iterateUntilEqual . simplifyStep
+
+-- | Simplify expression using some primitive rules
+-- like '0 * x -> 0' specified in `simplifyStep` implementation.
+simplify :: (ExtandableMap SimpleExpr SimpleExpr a a) => a -> a
+simplify = extendMap simplifyExpr

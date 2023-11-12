@@ -1,0 +1,450 @@
+{-# LANGUAGE FunctionalDependencies #-}
+--{-# LANGUAGE IncoherentInstances #-}
+
+module InfBackprop.Common2 where
+
+import Prelude ((.), id, fst, snd, uncurry, curry, ($), undefined, const)
+import qualified Prelude as P
+import NumHask ((*), (+), sin, cos, Additive, zero, Multiplicative, one, ExpField, exp, log, (**), Subtractive, negate, (-),
+  Divisive, recip, Field, sinh, cosh, AdditiveAction, MultiplicativeAction, (.*), (^), (^^), TrigField, two, Distributive, Integral)
+import Data.Bifunctor (bimap)
+import GHC.Base (Type)
+import NumHask.Prelude (Float)
+import Data.Void (Void, absurd)
+import Data.Profunctor.Extra (Outer, (***), outer)
+import Data.Profunctor (Profunctor, dimap, Strong, first', second', Costrong, unfirst)
+import Debug.SimpleExpr.Expr (number)
+
+--instance (Additive a, Additive b) => Additive (a, b) where
+--  zero = (zero, zero)
+--  (a1, b1) + (a2, b2) = (a1 + a2, b1 + b2)
+--
+--instance (Multiplicative a, Multiplicative b) => Multiplicative (a, b) where
+--  one = (one, one)
+--  (a1, b1) * (a2, b2) = (a1 * a2, b1 * b2)
+
+
+
+--class CatProfunctor cat p where
+--  dimap :: cat a b -> cat c d -> p b c -> p a d
+--
+--class CatCartesian p where
+--  first   :: p a b -> p (a, c) (b, c)
+--  second  :: p a b -> p (c, a) (c, b)
+
+
+cross :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+cross f g (x, y) = (f x, g y)
+
+fork :: (t -> a) -> (t -> b) -> t -> (a, b)
+fork f g x = (f x, g x)
+
+
+data D y dy x dx = D {
+  view    :: x -> y,
+  update  :: (dy, x) -> dx
+}
+
+(%) :: D z dz y dy -> D y dy x dx -> D z dz x dx
+(D v2 u2) % (D v1 u1) = D (v2 . v1) (\(dz, x) -> u1 (u2 (dz, v1 x), x))
+
+instance Profunctor (D a b) where
+  dimap f g (D v u) = D (v . f) (g . u . cross id f)
+
+instance Strong (D a b) where
+  first' (D v u) = D (v . fst) (fork (u . cross id fst) (snd . snd))
+  second' (D v u) = D (v . snd) (fork (fst . snd) (u . cross id snd))
+
+crossC :: D y1 dy1 x1 dx1 -> D y2 dy2 x2 dx2 -> D (y1, y2) (dy1, dy2) (x1, x2) (dx1, dx2)
+crossC (D v1 u1) (D v2 u2) = D (bimap v1 v2) (\((dy1, dy2), (x1, x2)) -> (u1 (dy1, x1), u2 (dy2, x2)))
+
+--instance Outer (D t dt) (,) where
+--  -- outer :: (D a b c1 d1) (D a b c2 d2) = D a b (c1, c2) (d1, d2)
+--  -- outer = undefined
+--  outer (D v1 u1 :: D t dt x1 dx1) (D v2 u2 :: D t dt x dx2) =
+--    D v u :: D a b (c1, c2) (d1, d2) where
+--      v = undefined -- bimap (v1 :: c1 -> a) (v2 :: c2 -> a) :: (c1, c2) -> (a, a)
+--      u = undefined
+--    D (bimap (v1 :: c1 -> a) (v2 :: c2 -> a) :: (c1, c2) -> (a, a)) (\((dy1, dy2), (x1, x2)) -> (u1 (dy1, x1), u2 (dy2, x2)))
+
+--newtype VecField x dx y dy = VecField ((x -> dx) -> y -> dy)
+
+--instance CatProfunctor (->) (->) where
+--  dimap f g m = g . m . f
+--
+--instance CatCartesian (->) where
+--  first m  = bimap m id
+--  second m = bimap id m
+
+--instance (Additive dx) => Additive (x -> dx) where
+--  zero = const zero
+--  f + g = \x -> f x + g x
+--
+--instance (Subtractive dx) => Subtractive (x -> dx) where
+--  negate f = negate . f
+--  f - g = \x -> f x - g x
+
+constC :: Additive dx => y -> D y dy x dx
+constC c = D (const c) (const zero)
+
+-- c -> c
+-- c -> D c dy x dx
+-- c -> D (D c dy x dx) (D c dy x dx) (D c dy x dx) D c dy x dx
+
+--class Const a b | b -> a where
+class Const a b where
+  const_ :: a -> b
+  
+instance Const a a where
+  const_ = id
+
+instance (Additive dx, Const y1 y2) => Const y1 (D y2 dy x dx) where
+  const_ = constC . const_
+
+
+--instance (Additive dx, Const y1 y2) => Const y1 (D y2 dy x dx) where
+--  const_ = constC . const_
+
+
+--const_ :: (Additive dx, Strong p) => y -> p y dy -> p x dx
+--const_ c = lensCtoP (constC c) 
+
+fstC :: Additive db => D a da (a, b) (da, db)
+fstC = D fst (\(da, _) -> (da, zero))
+
+sndC :: Additive da => D b db (a, b) (da, db)
+sndC = D snd (\(db, _) -> (zero, db))
+
+bimapC :: D y1 dy1 x1 dx1 -> D y2 dy2 x2 dx2 -> D (y1, y2) (dy1, dy2) (x1, x2) (dx1, dx2)
+bimapC (D v1 u1) (D v2 u2) = D (bimap v1 v2) (\((dy1, dy2), (x1, x2)) -> (u1 (dy1, x1), u2 (dy2, x2)))
+
+addC :: Additive x => 
+  D x dx (x, x) (dx, dx)
+addC = D (uncurry (+)) (\(dx, _) -> (dx, dx))
+
+multC :: (MultiplicativeAction dx x) => 
+  D x dx (x, x) (dx, dx)
+multC = D (uncurry (*)) (\(dy, (x1, x2)) -> (x2 .* dy, x1 .* dy))
+
+powC :: forall a b da. (
+    ExpField b, 
+    P.Ord b, 
+    Divisive a, 
+    Subtractive b, 
+    Integral b, 
+    MultiplicativeAction da a, 
+    MultiplicativeAction a b
+  ) => 
+    D a da (a, b) (da, da)
+powC = D (uncurry (^^)) (\(dc, (a, b)) -> (b .* (a ^^ (b - one)) .* dc, log b .* (a ^^ b) .* dc :: da))
+
+addLeft :: Additive dc => D y dy x dx -> D y dy (c, x) (dc, dx)
+addLeft (D v u) = D (v . snd) (\(dy, (_, x)) -> (zero, u (dy, x)))
+
+addRight :: Additive dc => D y dy x dx -> D y dy (x, c) (dx, dc)
+addRight (D v u) = D (v . fst) (\(dy, (x, _)) -> (u (dy, x), zero))
+
+
+
+--fff :: D z dz (x, y) (dx, dy) ->
+--fff = undefined
+
+--(.+.) :: forall t dt x dx. (Additive t, Additive dx) =>
+--  D t dt x dx -> D t dt x dx -> D t dt (x, x) (dx, dx)
+---- a .+. b = (lensCtoP addC) (crossC a b)
+--a .+. b = addC % crossC a b
+----a .+. b = addRight a + addLeft b
+----(.+.) (D v1 u1) (D v2 u2) =
+----  D (\(x1, x2) -> v1 x1 + v2 x2) (\(dt, (x1, x2)) -> (u1 (dt, x1), u2 (dt, x2)))
+--
+--(.*.) :: (
+--    Multiplicative t, 
+--    MultiplicativeAction dx t, 
+--    MultiplicativeAction dy t, 
+--    MultiplicativeAction dt t, 
+--    Additive dx, 
+--    Additive dy
+--  ) =>
+--    D t dt x dx -> D t dt y dy -> D t dt (x, y) (dx, dy)
+--a .*. b = multC % crossC a b
+----a .*. b = addRight a * addLeft b
+----a .*. b = addRight a * addLeft b
+----(.*.) (D v1 u1) (D v2 u2) =
+----  D (\(x1, x2) -> v1 x1 * v2 x2) (\(dt, (x1, x2)) -> (v2 x2 .* u1 (dt, x1), v1 x1 .* u2 (dt, x2)))
+--
+--(.^^.) :: (P.Ord y, Divisive x, Subtractive y, Integral y) =>
+--  D x dx x dx -> D x dx y dy -> D x dx (x, y) (dx, dy)
+--(.^^.) (D v1 u1) (D v2 u2) =
+--  D (\(x1, x2) -> v1 x1 ^^ v2 x2) (\(dt, (x1, x2)) -> ((v2 x2 * (v1 x1 ^^ (v2 x2 - one))) .* u1 (dt, x1), undefined))
+
+
+-- uncurry :: (a -> b -> c) -> (a, b) -> c
+-- uncarryC :: D (x, x) (dx, dx)
+-- uncurryC = D y1 dy1 x1 dx1
+
+
+
+
+
+type DP a b s t = forall p. Strong p => p a b -> p s t
+--type DP a b s t = forall p. Strong p => p s t -> p a b
+--type DP y dy x dx = forall p. Costrong p => p dx x -> p dy y
+ 
+lensCtoP :: D y dy x dx -> DP y dy x dx
+lensCtoP (D v u) = dimap (fork v id) u . first'
+--lensCtoP :: D y dy x dx -> DP y dy x dx
+--lensCtoP (D v u) = dimap (fork v id) u . first'
+--unfork :: (a -> t) -> (b -> t) -> (a, b) -> t
+--unfork f g x = (f x, g x)
+--fork :: (t -> a) -> (t -> b) -> t -> (a, b)
+--fork f g x = (f x, g x)
+
+instance (Additive y, Additive dx) => Additive (D y dy x dx) where
+  zero = D (const zero) (const zero)
+  (D v1 u1) + (D v2 u2) = D (\x -> v1 x + v2 x) (\t -> u1 t + u2 t)
+
+instance (Additive y, Additive dx, Subtractive y, Subtractive dx) => Subtractive (D y dy x dx) where
+  negate (D v u) = D (negate v) (negate u)
+  (D v1 u1) - (D v2 u2) = D (\x -> v1 x - v2 x) (\t -> u1 t - u2 t)
+
+instance (MultiplicativeAction dx y, Additive dx) => MultiplicativeAction (D y dy x dx) (D y dy x dx) where
+  D v1 u1 .* D v2 u2 = D (\x -> v1 x * v2 x) (\(dy, x) -> v2 x .* u1 (dy, x) + v1 x .* u2 (dy, x))
+
+instance (MultiplicativeAction dx y, Multiplicative y, Additive dx) => Multiplicative (D y dy x dx) where
+  one = D (const one) (const zero)
+  (D v1 u1) * (D v2 u2) = D (\x -> v1 x * v2 x) (\(dy, x) -> v2 x .* u1 (dy, x) + v1 x .* u2 (dy, x))
+
+instance (Distributive y, Distributive dx, MultiplicativeAction dx y) => Distributive (D y dy x dx) where
+
+
+
+
+--constC :: (Additive dx) => x -> D y dy x dx
+--constC c = D (const c) (\(_, _) -> zero)
+
+
+squareC :: (Additive x, MultiplicativeAction dx x) => D x dx x dx
+squareC = D (\x -> x * x) (\(dy, x) -> two * x .* dy)
+
+square :: (Additive x, MultiplicativeAction dx x) => DP x dx x dx
+square = lensCtoP squareC
+
+recipC :: (Divisive x, MultiplicativeAction dx x, Subtractive dx) => D x dx x dx
+recipC = D recip (\(dy, x) -> negate $ recip x^2 .* dy)
+
+instance (Divisive x, MultiplicativeAction dx x, Subtractive dx) => Divisive (D x dx x dx) where
+  recip = lensCtoP recipC
+
+instance (Divisive x, MultiplicativeAction dx x, Distributive x, Distributive dx, Subtractive dx, Subtractive x) =>
+  Field (D x dx x dx) where
+
+expC :: (ExpField x, MultiplicativeAction dx x) => D x dx x dx
+expC = D exp (\(dy, x) -> exp x .* dy)
+
+logC :: (ExpField x, MultiplicativeAction dx x) => D x dx x dx
+logC = D log (\(dy, x) -> recip x .* dy)
+
+instance (ExpField x, MultiplicativeAction dx x, Distributive dx, Subtractive dx) => ExpField (D x dx x dx) where
+  exp = lensCtoP expC
+--  exp (D v u) = D expV (\(dy, x) -> u (dy * expV x, x)) where
+--    expV = exp . v
+--  log (D v u) = D (log . v) (\(dy, x) -> u (dy / x, x))
+  log = lensCtoP logC
+  (**) = undefined -- :: a -> a -> a
+
+sinhC :: (TrigField x, MultiplicativeAction dx x) => D x dx x dx
+sinhC = D sinh (\(dy, x) -> cosh x .* dy)
+coshC :: (TrigField x, MultiplicativeAction dx x) => D x dx x dx
+coshC = D cosh (\(dy, x) -> sinh x .* dy)
+
+instance (TrigField x, MultiplicativeAction dx x, Distributive dx, Subtractive dx) => TrigField (D x dx x dx) where
+  sinh = lensCtoP sinhC
+  cosh = lensCtoP coshC
+
+
+
+class Differentiable x dx | x -> dx where
+  startBackprop :: x -> dx
+
+instance Multiplicative a => Differentiable a a where
+  startBackprop = const one
+
+--instance Multiplicative a => Differentiable a a where
+--  startBackprop = const one
+
+--instance Differentiable a Void where
+--  startBackprop = undefined
+
+
+instance MultiplicativeAction Float Float where
+  (.*) = (*)
+
+
+identity :: D a b a b
+identity = D id fst
+
+
+
+
+--identity2 :: D (D a b a b) (D a b a b) (D a b a b) (D a b a b)
+--identity2 = D id fst
+
+callC :: forall y dy x dx. D y dy x dx -> x -> y
+callC = view
+
+
+
+--derivativeC :: (Multiplicative dy) => D y dy x dx -> x -> dx
+--derivativeC l x = update l (one, x)
+
+derivativeC :: (Differentiable y dy, Multiplicative dy) => D y dy x dx -> x -> dx
+derivativeC l x = update l (startBackprop (view l x), x)
+
+
+derivative :: (Multiplicative dt, Differentiable t dt) => 
+  (D t dt t dt -> D t dt x dx) -> x -> dx
+derivative f = derivativeC (f identity)
+
+lensCToOp :: D y dy x dx -> (y -> dy) -> x -> dx
+lensCToOp = lensCtoP 
+
+derivativeCv2 :: forall y dy x dx. (Multiplicative dy) => D y dy x dx -> x -> dx
+derivativeCv2 l = lensCToOp l (const one :: y -> dy)
+
+--derivativeC2 :: D a b c d -> c -> d
+derivative2C_ :: (Differentiable t dt, Differentiable y dy, Multiplicative dy, Multiplicative dt) =>
+  D y dy (D t dt t dt) (D t dt x dx) -> x -> dx
+derivative2C_ l = derivative (derivativeC l)
+
+derivative1C :: (Differentiable y dy, Multiplicative dy) =>
+  D y dy x dx -> x -> dx
+derivative1C l = derivative $ lensCtoP l
+
+derivative2C :: (Differentiable t dt, Differentiable y dy, Multiplicative dy, Multiplicative dt) =>
+  D y dy (D t dt t dt) (D t dt x dx) -> x -> dx
+derivative2C l = derivative $ derivative $ lensCtoP l
+
+derivative3C :: (Differentiable t dt, Differentiable y dy, Differentiable u du, Multiplicative dy, Multiplicative dt, Multiplicative du) =>
+  D y dy (D t dt t dt) (D t dt (D u du u du) (D u du x dx)) -> x -> dx
+derivative3C l = derivative $ derivative $ derivative $ lensCtoP l
+
+
+derivative0 ::
+  (x -> dx) -> x -> dx
+derivative0 = id
+
+derivative1 :: (Differentiable t dt, Multiplicative dt) =>
+  (D t dt t dt -> D t dt x dx) -> x -> dx
+derivative1 = derivative
+
+derivative2 :: (Differentiable t dt, Differentiable u du_, Multiplicative du_, Multiplicative dt) =>
+  (D t dt t dt -> D t dt (D u du_ u du_) (D u du_ x dx)) -> x -> dx
+derivative2 = derivative . derivative
+
+derivative3 :: (Differentiable t dt, Differentiable u du, Differentiable v dv, Multiplicative dv, Multiplicative du, Multiplicative dt) =>
+  (D t dt t dt -> D t dt (D u du u du) (D u du (D v dv v dv) (D v dv x dx))) -> x -> dx
+derivative3 = derivative . derivative . derivative
+
+
+--derivativeV2 :: ((x -> dx) -> (y -> dy)) -> (y -> dy) -> x -> dx
+--derivativeV2 l = lensCToOp l (const one)
+
+
+
+-- secondDerivative :: (Multiplicative dy) => (D x dx x dx -> D y dy x dx) -> x -> dx
+
+
+type Simple = D Float Float Float Float
+type Simple2 = D Simple Simple Simple Simple
+
+temp2 = derivativeC (cosh identity) 0 :: Float
+--temp2 = call (cosh (identity :: D a Void a Void)) 0 :: Float
+
+temp3 = derivative cosh 0.0 :: Float
+temp3_0 = derivative2 cosh 0.0 :: Float
+
+temp3_1 = derivative (\x -> const_ (2 :: Float) * cosh x) 0.0 :: Float
+temp3_2 = derivative2 (\x -> const_ (2 :: Float) * cosh x) 0.0 :: Float
+--temp3_3 = derivative2 (\x -> const_ (2) * cosh x) 0.0 :: Float
+
+
+temp4 = derivativeCv2 coshC (0 :: Float) :: Float
+
+temp5 :: Float -> Float
+temp5 = sinh (*2)
+
+temp6 = derivative2C sinhC (0 :: Float) :: Float
+
+temp7 = (derivative $ derivative $ derivative $ sinh) 0 :: Float
+
+
+
+-- term8_0 :: D y dy y dy -> D y dy z dx
+
+-- D x dx x dx -> D x dx x dx -> D x dx z dz
+--term8 :: TrigField a => a -> a -> a
+--term8 a b = sinh a + cosh b
+
+--term8_1 = derivative (term8 (0 :: Float)) 0 :: Float
+
+-- | Test
+--
+-- >>> (callC (coshC :: D Float Float Float Float)) 0
+-- 1.0
+--
+-- >>> (derivativeC (coshC :: D Float Float Float Float)) 0
+-- 0.0
+--
+-- >>> callC (cosh (identity :: D Float Float Float Float)) 0
+-- 1.0
+--
+-- >>> cosh 0 :: Float
+-- 1.0
+--
+-- >>> derivativeC (cosh identity) (0 :: Float) :: Float
+-- 0.0
+--
+-- >>> (derivative cosh) (0.0 :: Float) :: Float
+-- 0.0
+--
+-- >>> callC (cosh identity :: Simple) zero
+-- 1.0
+--
+-- >>> (derivativeCv2 coshC) (0 :: Float) :: Float
+-- 0.0
+temp :: ()
+temp = ()
+
+
+
+
+
+
+--cosP :: forall p p1 p2. (CatCartesian p, CatCartesian p1, CatCartesian p2) => p (p1 Float Float) (p1 Float Float) -> p (p2 Float Float) (p2 Float Float)
+--cosP = D cosC (\(x, dy) -> dy * -sinC x)
+--
+--type Diff p a b c d = forall p1. CatCartesian p (p1 a b) (p1 c d)
+
+
+
+--smoothP :: forall p. CatCartesian p => p X X -> p X X
+
+
+
+--data D dx x = D {
+----  value   :: x,
+--  dValue  :: dx -> x
+--}
+--
+--instance CatProfunctor (->) D where
+--  dimap :: (dy -> dx) -> (x -> y) -> D dx x -> D dy y
+--  dimap df f (D dv) = D (f . dv . df)
+----  dimap df f (D v dv) = D (f v) (f . dv. df)
+--
+--instance CatCartesian D where
+--  first   :: D dx x -> D (dx, c) (x, c)
+--  first (D dv) = D (bimap dv id)
+--
+--  second  :: D dx x -> D (c, dx) (c, x)
+--  second (D dv) = D (bimap id dv)
+

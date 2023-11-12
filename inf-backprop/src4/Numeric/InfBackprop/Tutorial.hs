@@ -1,0 +1,365 @@
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+-- | Module    :  Numeric.InfBackprop.Tutorial
+-- Copyright   :  (C) 2024 Alexey Tochin
+-- License     :  BSD3 (see the file LICENSE)
+-- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
+--
+-- Tutorial for [inf-backprop](https://hackage.haskell.org/package/inf-backprop) package.
+module Numeric.InfBackprop.Tutorial 
+  ( -- * Quick start
+    -- $quick_start_simple_derivative
+
+    -- * Derivatives for symbolic expressions
+    -- $derivatives_for_symbolic_expressions
+
+    -- * Symbolic expressions visualization
+    -- $symbolic_expressions_visualization
+
+    -- * Multivalued function
+    -- $multivalued_function
+
+    -- * Gradinet
+    -- $gradient
+
+    -- * How it works
+    -- ** Backpropagation
+    -- $backpropagation
+    -- ** Lens
+    -- $lens
+    -- Differentiable types
+    -- $differntibale_types
+    -- ** Declaring custom derivatives
+    -- $custom_derivatives
+    -- ** Subexpression elimination
+    -- $subexpression_elimination
+  )
+where
+
+import GHC.Base ()
+  
+-- $quick_start_simple_derivative
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (Float, fmap, ($))
+--
+-- Consider the square function
+--
+-- \[
+--   f(x) := x^2
+-- \]
+--
+-- as a simple example. We import a polymorphic version of the multiplication operator
+--
+-- >>> import NumHask (Multiplicative, (*), (+), log)
+--
+-- '(*)'@ :: @'Multiplicative'@ a => a -> a -> a@
+--
+-- from the
+-- [numhask](https://hackage.haskell.org/package/numhask)
+-- package.
+-- Specifically, for @a :: Float@ we have
+--
+-- >>> f x = x * x
+-- >>> fmap f [-3, -2, -1, 0, 1, 2, 3] :: [Float]
+-- [9.0,4.0,1.0,0.0,1.0,4.0,9.0]
+--
+-- Next, the first derivative
+--
+-- \[
+--   f'(x) = 2 \cdot x
+-- \]
+--
+-- can be computed as follows:
+--
+-- >>> import Numeric.InfBackprop (derivative)
+-- >>> f' = derivative f :: Float -> Float
+-- >>> fmap f' [-3, -2, -1, 0, 1, 2, 3]
+-- [-6.0,-4.0,-2.0,0.0,2.0,4.0,6.0]
+-- 
+-- It is important to provide a type annotation like @Float -> Float@ for 'f'' to ensure correct type inference.
+--
+-- The second derivative 
+-- 
+-- \[
+--   f''(x) = 2 
+-- \]
+-- 
+-- is similarly straightforward:
+--
+-- >>> f'' = derivative $ derivative f :: Float -> Float
+-- >>> fmap f'' [-3, -2, -1, 0, 1, 2, 3]
+-- [2.0,2.0,2.0,2.0,2.0,2.0,2.0]
+--
+-- Of course, this approach also works for function compositions. For example:
+-- 
+-- \[
+--   g(x) := \log (x^2 + x^3)
+-- \]
+--
+-- >>> import NumHask.Extra (intPow)
+-- >>> g x = log (intPow 2 x + intPow 3 x)
+-- >>> g' = derivative g :: Float -> Float
+-- >>> g 1 :: Float
+-- 0.6931472
+-- >>> g' 1 :: Float
+-- 2.5
+
+-- $derivatives_for_symbolic_expressions
+-- 
+-- It would be more convenient to illustrate how differentiation works on symbolic expressions
+-- rather than on floating-point numbers.
+--
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (($))
+--
+-- We use the
+-- [simple-expr](https://hackage.haskell.org/package/simple-expr)
+-- package here for symbolic expressions. For example, a symbolic function
+--
+-- \[
+--   f(x) := \sin x^2
+-- \]
+--
+-- can be defined as follows:
+--
+-- >>> import NumHask ((*), sin, cos)
+-- >>> import NumHask.Extra (intPow)
+-- >>> import Debug.SimpleExpr (variable, simplify, SimpleExpr)
+-- >>> x = variable "x"
+-- >>> f = \x -> sin (intPow 2 x)
+-- >>> f x
+-- sin(x*x)
+--
+-- Calculating the symbolyc derivative
+--
+-- \[
+--   f'(x) := 2 x \cos x^2
+-- \]
+--
+-- of @f@ is straightforward
+--
+-- >>> import Numeric.InfBackprop (derivative)
+-- >>> f' = derivative f
+-- >>> simplify $ f' x :: SimpleExpr
+-- (2*x)*cos(x*x)
+--
+-- Notice that we still use the universal definitions of 'cos', '(*)' and ather operations from the
+-- [numhask](https://hackage.haskell.org/package/numhask)
+-- package.
+
+-- $symbolic_expressions_visualization
+--
+-- The
+-- [simple-expr](https://hackage.haskell.org/package/simple-expr)
+-- package is equipped with a visualization tool that can be used to illustrate the differentiation workflow.
+--
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (($), (.))
+-- >>> import Debug.SimpleExpr (SimpleExpr, variable, simplify, plotExpr, plotDGraphPng)
+-- >>> import Debug.DiffExpr (unarrySymbolycFunc)
+-- >>> import Numeric.InfBackprop (derivative)
+--
+-- As a warm-up, consider a simple composition of two symbolic functions:
+--
+-- \[
+--   x \mapsto g(f(x))
+-- \]
+--
+-- which can be defined as follows:
+--
+-- >>> x = variable "x" :: SimpleExpr
+-- >>> f = unarrySymbolycFunc "f" :: SimpleExpr -> SimpleExpr
+-- >>> g = unarrySymbolycFunc "g" :: SimpleExpr -> SimpleExpr
+-- >>> g (f x) :: SimpleExpr
+-- g(f(x))
+--
+-- This basic example can be plotted with:
+--
+-- @ plotExpr $ g (f x) @
+--
+-- ![image description](doc/images/composition.png)
+--
+-- The graph for the first derivative can be depicted with:
+--
+-- @ plotExpr $ simplify $ derivative (g . f) x @
+--
+-- ![image description](doc/images/composition_derivative.png)
+--
+-- Here,
+-- 'simplify'@ :: @'SimpleExpr'@ -> @'SimpleExpr'@
+-- is a function that removes unnecessary differentiation artifacts like @*1@ and @+0@.
+--
+-- The second derivative can be plotted in a similarly straightforward manner:
+--
+-- @ plotExpr $ simplify $ derivative (derivative (g . f)) x @
+--
+-- ![image description](doc/images/composition_second_derivative.png)
+
+-- $multivalued_function
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (Float, fmap, ($), Int, (.), (<>))
+-- >>> import GHC.Show (show)
+-- >>> import Data.Tuple (fst, snd)
+-- >>> import NumHask ((*), (+), log, Multiplicative, cos, sin, TrigField, Additive)
+-- >>> import Prelude.Tools (cross)
+-- >>> import Data.Stream (Stream, take, fromList)
+-- >>> import Debug.DiffExpr (SymbolicFunc, unarrySymbolycFunc, BinnarySymbolicFunc, binarySymbolycFunc) 
+-- >>> import qualified Data.Vector.Fixed as DVF
+-- >>> -- import qualified Data.Vector.Fixed.Boxed as DVFB
+-- >>> import qualified Data.Vector.Generic.Sized as DVGS
+-- >>> import qualified Data.Vector as DV
+-- >>> import Optics ((%), Iso')
+--
+-- >>> import Debug.SimpleExpr (variable, SimpleExpr, simplify)
+-- >>> import Numeric.InfBackprop (derivative)
+-- >>> -- import Numeric.InfBackprop (derivative, customDerivative, intPow, tupleLensIso, idIso, smallVecLensIso, LensD(LensD))
+-- >>> -- import InfBackprop.Vector (smallVecToLens, longVecToLens)
+-- >>> -- import InfBackprop.Stream (streamLensIso)
+-- >>> -- import Data.FiniteList (BoundedStream)
+-- >>> -- import qualified Data.Vector.Generic.Sized as DVGS
+-- >>> -- import qualified Data.Vector as DV
+-- >>> -- import Optics.InfBackpropExtra (crossed, fmaped)
+--
+-- >>> x = variable "x"
+-- >>> :{
+--    f :: TrigField a => a -> (a, a)
+--    f x_ = (sin x_, cos x_)
+-- :}
+--
+-- >>> f' = simplify . derivative f :: SimpleExpr -> (SimpleExpr, SimpleExpr)
+-- >>> f' x
+-- (cos(x),-(sin(x)))
+--
+-- >>> f'' = simplify . (derivative $ derivative f) :: SimpleExpr -> (SimpleExpr, SimpleExpr)
+-- >>> f'' x
+-- (-(sin(x)),-(cos(x)))
+-- 
+-- -- >>> v = (\x' -> fromList [unarrySymbolycFunc "v_x" x', unarrySymbolycFunc "v_y" x', unarrySymbolycFunc "v_z" x') :: SymbolicFunc a => a -> DVFB.Vec 3 a
+--
+-- 
+-- >>> :{
+--    v :: SymbolicFunc a => a -> DVGS.Vector DV.Vector 3 a
+--    v x = DVGS.fromTuple (unarrySymbolycFunc "v_x" x, unarrySymbolycFunc "v_y" x, unarrySymbolycFunc "v_z" x)
+-- :}
+--
+-- -- >>> v = (\x' -> DVF.mk3 (x') (x' + 1) (x' + 2) :: SymbolicFunc a => a -> DVFB.Vec 3 a
+--
+-- >>> v x
+-- Vector [v_x(x),v_y(x),v_z(x)]
+-- 
+-- 
+--
+--
+--
+-- -- >>> f3''' = (\x -> DVGS.fromTuple (x * x, x * x * x)) :: (Multiplicative a) => a -> DVGS.Vector DV.Vector 2 a
+-- -- >>> temp = derivative (longVecToLens . f3''') :: Float -> DVGS.Vector DV.Vector 2 Float
+-- 
+-- -- >>> temp 2
+-- -- Vector [4.0,12.0]
+--  
+-- 
+-- -- >>> vecFunc = (\x -> DVF.mk2 (intPow 2 x) (intPow 3 x)) :: (Multiplicative a) => a -> LongVec 2 a
+-- -- >>> temp = derivative (smallVecToLens . vecFunc) :: Float -> LongVec 2 Float
+-- 
+-- -- >>> temp 2
+-- -- fromList [4.0,12.0]
+--
+-- -- >>> f3' = (\x -> DVF.mk2 (x * x) (x * x * x)) :: (SymbolicFunc a, Multiplicative a) => a -> DVFB.Vec 2 a
+-- -- >>> temp = smartSimplify . derivative (smallVecToLens . f3') :: SimpleExpr -> DVFB.Vec 2 SimpleExpr
+-- 
+-- -- >>> temp x
+-- -- fromList [x+x,((x*x)+(x*x))+(x*x)]
+--
+--`
+--
+-- -- >>> smallVecDerivative = customDerivative smallVecLensIso idIso
+-- 
+-- -- >>> v' = smartSimplify . smallVecDerivative v :: SimpleExpr -> DVFB.Vec 3 SimpleExpr
+-- -- >>> v' x
+-- -- Vector [v_x'(x),v_y'(x),v_z'(x)]
+-- 
+-- 
+-- 
+-- Streams:
+-- >>> streamF = (\x -> fromList [unarrySymbolycFunc ("f_" <> show n) x | n <- [0..]]) :: SymbolicFunc a => a -> Stream a
+-- >>> take 5 (streamF x)
+-- [f_0(x),f_1(x),f_2(x),f_3(x),f_4(x)]
+--
+-- >>> streamF' = simplify . derivative streamF :: SimpleExpr -> Stream SimpleExpr
+-- >>> take 5 (streamF' x)
+-- [f_0'(x),f_1'(x),f_2'(x),f_3'(x),f_4'(x)]
+--
+-- >>> g = \x -> (v x, streamF x)
+-- 
+-- -- >>> gDerivative = customDerivative (tupleLensIso % crossed smallVecLensIso streamLensIso) idIso
+-- >>> g' = simplify . derivative g :: SimpleExpr -> (DVGS.Vector DV.Vector 3 SimpleExpr, Stream SimpleExpr)
+-- 
+-- >>> fst $ g' x
+-- Vector [v_x'(x),v_y'(x),v_z'(x)]
+--
+-- >>> take 5 $ snd $ g' x
+-- [f_0'(x),f_1'(x),f_2'(x),f_3'(x),f_4'(x)]
+--
+
+-- $subexpression_elimination
+-- >>> :set -XNoImplicitPrelude
+-- >>> import GHC.Base (Float, fmap, ($), Int, (.), (<>))
+-- >>> import Debug.DiffExpr (TraceSymbolicFunc, traceUnarrySymbolycFunc)
+-- >>> import Debug.SimpleExpr (variable, simplify, simplifyExpr, SimpleExpr)
+-- >>> import Debug.Trace (trace)
+-- >>> import Numeric.InfBackprop (derivative)
+-- >>> import Numeric.InfBackprop.DFunc2 (view, identity)
+-- >>> import NumHask ((+), Additive)
+--
+-- >>> :{
+--    f, g, h :: TraceSymbolicFunc a => a -> a
+--    f = traceUnarrySymbolycFunc "f"
+--    g = traceUnarrySymbolycFunc "g"
+--    h = traceUnarrySymbolycFunc "h"
+--    k = traceUnarrySymbolycFunc "k"
+--    xVar = variable "x" :: SimpleExpr
+--    subexpF :: (TraceSymbolicFunc a) => a -> (a, a)
+--    subexpF x = let y = f x in (g y, h y)
+--    subexpK :: (TraceSymbolicFunc a, Additive a) => a -> a
+--    subexpK x = k (g y + h y) where y = f x
+-- :}
+--
+--
+-- >>> h(g(f xVar)) :: SimpleExpr
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of g(f(x)) >>>
+-- h(g(f(x)))
+--
+-- >>> (view (subexpK identity)) xVar
+--
+--
+--
+-- >>> simplify $ derivative (h . g . f) xVar :: SimpleExpr
+--
+--
+--
+--
+-- >>> simplify $ subexpF xVar :: (SimpleExpr, SimpleExpr)
+-- ( <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+-- g(f(x)), <<< TRACING: Calculating h of f(x) >>>
+-- h(f(x)))
+--
+-- >>> simplify $ subexpK xVar :: SimpleExpr
+--  <<< TRACING: Calculating f of x >>>
+--  <<< TRACING: Calculating g of f(x) >>>
+--  <<< TRACING: Calculating h of f(x) >>>
+--  <<< TRACING: Calculating k of g(f(x))+h(f(x)) >>>
+-- k(g(f(x))+h(f(x)))
+--
+--
+--
+--
+-- >>> simplify $ derivative subexpK xVar :: SimpleExpr
+--
+--
+--
+-- >>> d = simplify $ derivative subexpF xVar :: (SimpleExpr, SimpleExpr)
+-- >>> d
+--
