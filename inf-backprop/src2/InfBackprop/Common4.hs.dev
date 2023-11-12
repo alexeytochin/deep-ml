@@ -1,0 +1,191 @@
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+module InfBackprop.Common4 where
+
+import Prelude (Float, const, id, id, uncurry, (.), fst, snd, ($), undefined)
+import NumHask (Additive, Multiplicative, (*), one, Additive, zero, (+), (-), Subtractive, negate, Distributive, 
+  TrigField, sinh, cosh, Divisive, recip, ExpField, Field, exp, log, (**), two, (^))
+import Data.Profunctor (Costrong, unsecond, dimap, unfirst, Profunctor, dimap)
+
+
+cross :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+cross f g (x, y) = (f x, g y)
+
+fork :: (t -> a) -> (t -> b) -> t -> (a, b)
+fork f g x = (f x, g x)
+
+
+class MultiplicativeAction a b c | a b -> c where
+  infixl 7 ..*
+  (..*) :: a -> b -> c
+
+instance (MultiplicativeAction a b1 c1, MultiplicativeAction a b2 c2) => MultiplicativeAction a (b1, b2) (c1, c2) where
+  a ..* (b1, b2) = (a ..* b1, a ..* b2)
+
+
+
+data D dx x dy y  = D {
+  view    :: x -> y,
+  update  :: x -> dy -> dx
+}
+
+(%) :: D dy y dz z -> D dx x dy y -> D dx x dz z
+(D v2 u2) % (D v1 u1) = D (v2 . v1) (\x dz -> u1 x (u2 (v1 x) dz))
+
+
+instance Profunctor (D dx x) where
+  dimap :: (dz -> dy) -> (y -> z) -> D dx x dy y -> D dx x dz z
+  dimap f g (D v u) = D (g . v) (\x dz -> u x (f dz)) 
+
+instance Costrong (D dt t) where
+  -- unfirst  :: p (a, d) (b, d) -> p a b
+  unfirst :: D dt t (dx, a) (x, a) -> D dt t dx x
+  unfirst (D v u) = D (fst . v) (\t dx -> u t (dx, snd (v t)))
+
+instance (Additive y, Additive dx) => Additive (D dx x dy y) where
+  zero = D (const zero) (const zero)
+  (D v1 u1) + (D v2 u2) = D (\x -> v1 x + v2 x) (\t -> u1 t + u2 t)
+
+instance (Subtractive y, Subtractive dx) => 
+  Subtractive (D dx x dy y) where
+    negate (D v u) = D (negate v) (negate u)
+    (D v1 u1) - (D v2 u2) = D (\x -> v1 x - v2 x) (\t -> u1 t - u2 t)
+
+instance (MultiplicativeAction y dx dx, Additive dx, Multiplicative y) => 
+  MultiplicativeAction (D dx x dy y) (D dx x dy y) (D dx x dy y) where
+    D v1 u1 ..* D v2 u2 = D (\x -> v1 x * v2 x) (\x dy -> v2 x ..* u1 x dy + v1 x ..* u2 x dy)
+
+instance (MultiplicativeAction y dx dx, Additive dx, Multiplicative y) => 
+  Multiplicative (D dx x dy y) where
+    one = D (const one) (const zero)
+    (D v1 u1) * (D v2 u2) = D (\x -> v1 x * v2 x) (\x dy -> v2 x ..* u1 x dy + v1 x ..* u2 x dy)
+
+instance (Distributive y, Distributive dx, MultiplicativeAction y dx dx) =>
+  Distributive (D dx x dy y) where
+
+
+class Differentiable x dx | x -> dx where
+  startBackprop :: x -> dx
+
+instance Differentiable Float Float where
+  startBackprop = const 1
+
+instance (Differentiable x1 dx1, Differentiable x2 dx2) => 
+  Differentiable (x1, x2) (dx1, dx2) where
+    startBackprop = cross startBackprop startBackprop
+
+
+instance (Additive dx, MultiplicativeAction y dx dx, Multiplicative y) => -- MultiplicativeAction dx y,
+  Differentiable (D dx x dy y) (D dx x dy y) where
+    startBackprop = const one
+
+
+
+type DP dx x dy y = forall p. Costrong p => p dx x -> p dy y
+
+identity :: D a b a b
+identity = D id (const id)
+
+lensCtoP :: D dx x dy y -> DP dx x dy y
+lensCtoP (D v u) = unsecond . dimap (uncurry u) (fork id v)
+
+lensPtoC :: DP dx x dy y -> D dx x dy y
+lensPtoC f = f identity
+
+
+derivativeC :: (Differentiable y dy) => 
+  D dx x dy y -> x -> dx
+derivativeC l x = update l x (startBackprop (view l x))
+
+class Derivative a b x dx where
+  derivative :: (a -> b) -> (x -> dx)
+
+instance Differentiable y dy =>
+  Derivative (D dx x dx x) (D dx x dy y) x dx where
+    derivative f = derivativeC (f identity)
+
+instance Differentiable y dy =>
+  Derivative (D dx x dx x, D dx x dx x) (D dx x dy y) x dx where
+    derivative f = derivativeC (f (identity, identity))
+
+--class Derivative a x dx where
+--  derivative :: a -> (x -> dx)
+
+--instance Differentiable y dy => 
+--  Derivative (D dx x dy y) x dx where
+--    derivative = derivativeC
+
+--instance (Differentiable y1 dy1, Differentiable y2 dy2) => 
+--  Derivative (D dx x dy1 y1, D dx x dy2 y2) x (dx, dx) where
+--    derivative = derivativeC
+
+
+--instance Derivative d x dx => 
+--  Derivative (D dx x dx x -> d) x dx where
+--    derivative f = derivative (f identity)
+--
+--instance Derivative d x dx => 
+--  Derivative ((D dx x dx x, D dx x dx x) -> d) x dx where
+--    derivative f = derivative (f (identity, identity))
+
+derivative0 ::
+  (x -> dx) -> x -> dx
+derivative0 = id
+
+--derivative1 = derivative
+--
+--derivative2 = derivative . derivative
+
+
+squareC :: (Additive x, MultiplicativeAction x dx dx, Multiplicative x) =>
+  D dx x dx x
+squareC = D (\x -> x * x) (\x dy -> two * x ..* dy)
+
+square :: (Additive x, MultiplicativeAction x dx dx, Multiplicative x) =>
+  DP dx x dx x
+square = lensCtoP squareC
+
+recipC :: (Divisive x, MultiplicativeAction x dx dx, Subtractive dx) =>
+  D dx x dx x
+recipC = D recip (\x dy -> negate $ recip x^2 ..* dy)
+
+instance (Divisive x, MultiplicativeAction x dx dx, Subtractive dx) =>
+  Divisive (D dx x dx x) where
+    recip = lensCtoP recipC
+
+instance (Divisive x, MultiplicativeAction x dx dx, Distributive x, Distributive dx, Subtractive dx, Subtractive x) =>
+  Field (D dx x dx x) where
+
+expC :: (ExpField x, MultiplicativeAction x dx dx) =>
+  D dx x dx x
+expC = D exp (\x dy -> exp x ..* dy)
+
+logC :: (ExpField x, MultiplicativeAction x dx dx) =>
+  D dx x dx x
+logC = D log (\x dy -> recip x ..* dy)
+
+instance (ExpField x, MultiplicativeAction x dx dx, Distributive dx, Subtractive dx) =>
+  ExpField (D dx x dx x) where
+    exp = lensCtoP expC
+--  exp (D v u) = D expV (\(dy, x) -> u (dy * expV x, x)) where
+--    expV = exp . v
+--  log (D v u) = D (log . v) (\(dy, x) -> u (dy / x, x))
+    log = lensCtoP logC
+    (**) = undefined -- :: a -> a -> a
+
+sinhC :: (TrigField x, MultiplicativeAction x dx dx) => D dx x dx x
+sinhC = D sinh (\x dy -> cosh x ..* dy)
+coshC :: (TrigField x, MultiplicativeAction x dx dx) => D dx x dx x
+coshC = D cosh (\x dy -> sinh x ..* dy)
+
+instance (TrigField x, MultiplicativeAction x dx dx, Distributive dx, Subtractive dx) =>
+  TrigField (D dx x dx x) where
+    sinh = lensCtoP sinhC
+    cosh = lensCtoP coshC
+
+
+
+--example_0_0 = derivative0 cosh (0.0 :: Float) :: Float
+--example_0_1 = (derivative cosh) (0.0 :: Float) :: Float
+--example_0_2 = (derivative . derivative) cosh (0.0 :: Float) :: Float

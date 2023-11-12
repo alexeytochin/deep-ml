@@ -1,0 +1,120 @@
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
+module Data.Basis where
+
+import GHC.Base (Type)
+import Prelude (undefined)
+import NumHask (Additive, zero, Multiplicative, one, Distributive)
+
+class Basis a b c where
+  basis :: (a -> b) -> c
+  zero' :: a
+  
+--type Tuple a = (a, a)
+  
+  
+instance forall a1 a2 b c1_ c2_. (
+--    Additive a1, 
+--    Additive a2, 
+      Basis a1 b c1_, 
+      Basis a2 b c2_
+    ) => 
+  Basis (a1, a2) b (c1_, c2_) where
+    basis :: ((a1, a2) -> b) -> (c1_, c2_)
+    basis f = (basis (\(x1 :: a1) -> f (x1, zero')), basis (\x2 -> f (zero', x2)))
+    zero' = (zero', zero')
+    
+instance (
+    Additive a1, 
+    Additive a2, 
+    Additive a3, 
+    Basis a1 b c1, 
+    Basis a2 b c2, 
+    Basis a3 b c3
+  ) => 
+  Basis (a1, a2, a3) b (c1, c2, c3) where
+    basis :: ((a1, a2, a3) -> b) -> (c1, c2, c3)
+    basis f = (basis (\x1 -> f (x1, zero, zero)), basis (\x2 -> f (zero, x2, zero)), basis (\x3 -> f (zero, zero, x3)))
+
+basisTT :: (
+    Distributive a00, 
+    Distributive a01, 
+    Distributive a02, 
+    Distributive a10, 
+    Distributive a11, 
+    Distributive a12
+  ) =>(((a00, a01, a02), (a10, a11, a12)) -> b) -> ((b, b, b), (b, b, b))
+basisTT = basis
+    
+    
+    
+scalarBasis :: Multiplicative a => 
+  (a -> b) -> b
+scalarBasis f = f one
+    
+tupleBasis :: (Additive a1, Additive a2) => 
+  ((a1 -> b) -> c1) -> ((a2 -> b) -> c2) -> ((a1, a2) -> b) -> (c1, c2)
+tupleBasis basis1 basis2 f = (
+    basis1 (\x1 -> f (x1, zero)), 
+    basis2 (\x2 -> f (zero, x2))
+  )
+
+tupleBasis2 ::  
+  ((a1 -> b) -> c1) -> a1 -> ((a2 -> b) -> c2) -> a2 -> ((a1, a2) -> b) -> (c1, c2)
+tupleBasis2 basis1 zero1 basis2 zero2 f = (
+    basis1 (\x1 -> f (x1, zero2)), 
+    basis2 (\x2 -> f (zero1, x2))
+  )
+
+
+--tupleZero :: a1 -> a2 -> (a1, a2)
+--tupleZero = (,)
+
+
+  
+tripleBasis :: (Additive a1, Additive a2, Additive a3) => 
+  ((a1 -> b) -> c1) -> ((a2 -> b) -> c2) -> ((a3 -> b) -> c3) -> ((a1, a2, a3) -> b) -> (c1, c2, c3)
+tripleBasis basis1 basis2 basis3 f = (
+    basis1 (\x1 -> f (x1, zero, zero)), 
+    basis2 (\x2 -> f (zero, x2, zero)), 
+    basis3 (\x3 -> f (zero, zero, x3))
+  )
+  
+tripleBasis2 :: 
+  ((a1 -> b) -> c1) -> a1 -> ((a2 -> b) -> c2) -> a2 -> ((a3 -> b) -> c3) -> a3 -> ((a1, a2, a3) -> b) -> (c1, c2, c3)
+tripleBasis2 basis1 zero1 basis2 zero2 basis3 zero3 f = (
+    basis1 (\x1 -> f (x1, zero2, zero3)), 
+    basis2 (\x2 -> f (zero1, x2, zero3)), 
+    basis3 (\x3 -> f (zero1, zero2, x3))
+  )
+  
+tupleF :: (Distributive a1, Distributive a2) => 
+  ((a1, a2) -> b) -> (b, b)
+tupleF = tupleBasis scalarBasis scalarBasis
+
+tupleF2 :: (Distributive a1, Distributive a2) =>
+  ((a1, a2) -> b) -> (b, b)
+tupleF2 = tupleBasis2 scalarBasis zero scalarBasis zero
+
+--tupleTripleF :: (
+--    Distributive a00, 
+--    Distributive a01, 
+--    Distributive a02, 
+--    Distributive a10, 
+--    Distributive a11, 
+--    Distributive a12
+--  ) => 
+--    (((a00, a01, a02), (a10, a11, a12)) -> b) -> ((b, b, b), (b, b, b))
+--tupleTripleF = tupleBasis (tripleBasis scalarBasis scalarBasis scalarBasis) (tripleBasis scalarBasis scalarBasis scalarBasis)
+
+tupleTripleF2 :: (
+    Distributive a00, 
+    Distributive a01, 
+    Distributive a02, 
+    Distributive a10, 
+    Distributive a11, 
+    Distributive a12
+  ) => 
+    (((a00, a01, a02), (a10, a11, a12)) -> b) -> ((b, b, b), (b, b, b))
+tupleTripleF2 = tupleBasis2 (tripleBasis2 scalarBasis zero scalarBasis zero scalarBasis zero) (zero, zero, zero) (tripleBasis2 scalarBasis zero scalarBasis zero scalarBasis zero) (zero, zero, zero)
