@@ -1,4 +1,4 @@
-resolver: nightly-2023-11-10
+resolver: nightly-2023-12-12 # ghc 9.6.3
 
 packages:
   - inf-backprop
