@@ -42,10 +42,21 @@ library
       IsomorphismClass.Isomorphism
       NumHask.Extra
       Prelude.InfBackprop
+      Data.Basis2
+      Data.Basis3
+      Data.Linear
+      Data.Profunctor.Extra
+      InfBackprop.Common6
+      InfBackprop.LensD
+      InfBackprop.Tangent
+      InfBackprop.Temp
+      InfBackprop.Temp2
+      Prelude.Tools
   other-modules:
       Paths_inf_backprop
   hs-source-dirs:
       src
+      src2
   default-extensions:
       NoImplicitPrelude
       GADTs
@@ -61,14 +72,22 @@ library
       DeriveFunctor
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      Stream
+    , base >=4.7 && <5
     , comonad
+    , finite-typelits
+    , fixed-vector
     , isomorphism-class
     , monad-logger
     , numhask
+    , optics
+    , primitive
+    , profunctors
     , simple-expr
     , text
     , transformers
+    , vector
+    , vector-sized
   default-language: Haskell2010
 
 test-suite doctests
@@ -80,13 +99,21 @@ test-suite doctests
       doctests
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      Stream
+    , base >=4.7 && <5
     , comonad
     , doctest
+    , finite-typelits
+    , fixed-vector
     , isomorphism-class
     , monad-logger
     , numhask
+    , optics
+    , primitive
+    , profunctors
     , simple-expr
     , text
     , transformers
+    , vector
+    , vector-sized
   default-language: Haskell2010

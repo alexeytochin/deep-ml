@@ -1,46 +1,78 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE UndecidableInstances #-}
+--{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module InfBackprop.Common6 where
 
-import Prelude ((.), id, fst, snd, uncurry, curry, ($), undefined, const, fmap, Functor)
-import qualified Prelude as P
-import NumHask ((*), (+), sin, cos, Additive, zero, Multiplicative, one, ExpField, exp, log, (**), sqrt, sinh, cosh, 
+import Prelude ((.), id, fst, snd, uncurry, curry, ($), undefined, const, fmap, Functor, (<*>))
+import Prelude hiding (sinh, cosh, (*), (+), (-), negate, recip, exp, (^), (^^), (/), log, sqrt, unzip, sum)
+-- import qualified Prelude as P
+import NumHask ((*), (+), sin, cos, Additive, zero, sum, Multiplicative, one, ExpField, exp, log, (**), sqrt, sinh, cosh,
   Subtractive, negate, (-),
   Divisive, recip, (/), Field, AdditiveAction, (^), (^^), TrigField, two, Distributive, Integral)
 -- import qualified NumHask as NH (sqrt, sinh, cosh)
 import Data.Bifunctor (bimap)
 import GHC.Base (Type)
 import NumHask.Prelude (Float, flip)
-import Prelude hiding (sinh, cosh, (*), (+), (-), negate, recip, exp, (^), (^^), (/), log, sqrt)
 import Data.Void (Void, absurd)
 import Data.Profunctor.Extra (Outer, (***), outer)
 import Data.Profunctor (Profunctor, dimap, Strong, first', second', Costrong, unfirst, unsecond)
 
 import Debug.SimpleExpr.Expr (number)
-import Data.Basis2 (basis, End, Basis)
+import Data.Basis3 (Basis, initBackProp, zeroBackProp, End, Vec, myBasisVector)
 import Data.Linear (tupleDual, listDual)
 import InfBackprop.LensD (LensD(LensD), view, update, unpackLensD, DFunc)
 import InfBackprop.Tangent (T)
 import Prelude.Tools (fork)
+import Data.List.NonEmpty (unzip)
+import GHC.TypeLits (KnownNat)
+import Data.Vector.Generic.Sized (index, generate, Vector(..))
+--import Data.Vector.Generic ((!))
+import qualified Data.Vector.Fixed.Boxed as VFB
+--import Data.Vector.Generic (generate)
+import qualified Data.Vector.Fixed.Cont as DVFC -- (Peano, generate)
+import qualified Data.Vector.Fixed as DVF --  Arity)
+import Data.Proxy (Proxy(Proxy))
+
 
 squareC :: (Additive x, Multiplicative x, T x ~ x) => -- , Diff x ~ x) =>
   DFunc x x
 squareC = LensD $ \x -> (x * x, \dy -> two * x * dy)
 
-square :: (Additive x, Multiplicative x, T x ~ x) =>
-  DP x x x x
-square = lensCtoP squareC
+--square :: (Additive x, Multiplicative x, T x ~ x) =>
+--  DP x x x x
+--square = lensCtoP squareC
 
 recipC :: (Divisive x, Subtractive x, T x ~ x) =>
   DFunc x x
 recipC = LensD $ \x -> (recip x, \dy -> negate $ recip x^2 * dy)
 
+--instance (Distributive dx, y ~ dx) => 
+--  Divisive (LensD dx x dy y) where
+--    recip = lensCtoP recipC
+
 instance (Divisive x, Subtractive dx, dx ~ x, T x ~ dx) =>
   Divisive (LensD dx x dx x) where
     recip = lensCtoP recipC
+
+instance (Field x, x ~ T x) => 
+  Field (LensD x x x x)
+
+sinhC :: (TrigField x, x ~ T x) => DFunc x x
+sinhC = LensD $ \x -> (sinh x, \dy -> cosh x * dy)
+
+coshC :: (TrigField x, x ~ T x) => DFunc x x
+coshC = LensD $ \x -> (cosh x, \dy -> sinh x * dy)
+
+instance (TrigField x, x ~ T x) =>
+  TrigField (LensD x x x x) where
+    sinh = lensCtoP sinhC
+
+
 
 
 -- DP
@@ -75,26 +107,107 @@ lensPtoC f = f identity
 
 
 
---tupleToLens :: Additive dt =>
---  (D dt t dx1 x1, D dt t dx2 x2) -> D dt t (dx1, dx2) (x1, x2)
----- tupleToLens (D v1 u1, D v2 u2) = D (\t -> (v1 t, v2 t)) (\t (dy1, dy2) -> u1 t dy1 + u2 t dy2)
---tupleToLens (D a1, D a2) = D $ \t -> let
---    (x1, dxt1) = a1 t
---    (x2, dxt2) = a2 t
---  in ((x1, x2), \(dx1, dx2) -> dxt1 dx1 + dxt2 dx2)
----- crossC3 (D v1 u1) (D v2 u2) = D (fork v1 v2) ()
---
---lensToTuple :: (Additive dx1, Additive dx2) =>
---  D dt t (dx1, dx2) (x1, x2) -> (D dt t dx1 x1, D dt t dx2 x2)
----- lensToTuple (D v u) = (D (fst . v) (\t dy1 -> u t (dy1, zero)), D (snd . v) (\t dy2 -> u t (zero, dy2)))
---lensToTuple (D a) = (D a1, D a2) where
---  a1 = \t -> let
---      ((x1, _), dxt) = a t
---    in (x1, \dx1 -> dxt (dx1, zero))
---  a2 = \t -> let
---      ((_, x2), dxt) = a t
---    in (x2, \dx2 -> dxt (zero, dx2))
---
+
+tupleToLens :: Additive dt =>
+  (LensD dt t dx1 x1, LensD dt t dx2 x2) -> LensD dt t (dx1, dx2) (x1, x2)
+-- tupleToLens (D v1 u1, D v2 u2) = D (\t -> (v1 t, v2 t)) (\t (dy1, dy2) -> u1 t dy1 + u2 t dy2)
+tupleToLens (LensD a1, LensD a2) = LensD $ \t -> let
+    (x1, dxt1) = a1 t
+    (x2, dxt2) = a2 t
+  in ((x1, x2), \(dx1, dx2) -> dxt1 dx1 + dxt2 dx2)
+-- crossC3 (D v1 u1) (D v2 u2) = D (fork v1 v2) ()
+
+tupleToLens_ :: Additive (T t) =>
+  (DFunc t x1, DFunc t x2) -> DFunc t (x1, x2)
+tupleToLens_ = tupleToLens
+
+tupleValue :: Additive (T t) =>
+  (x -> (DFunc t x1, DFunc t x2)) -> x -> DFunc t (x1, x2)
+tupleValue f = tupleToLens_ . f
+
+lensToTuple :: (Additive dx1, Additive dx2) =>
+  LensD dt t (dx1, dx2) (x1, x2) -> (LensD dt t dx1 x1, LensD dt t dx2 x2)
+-- lensToTuple (D v u) = (D (fst . v) (\t dy1 -> u t (dy1, zero)), D (snd . v) (\t dy2 -> u t (zero, dy2)))
+lensToTuple (LensD a) = (LensD a1, LensD a2) where
+  a1 = \t -> let
+      ((x1, _), dxt) = a t
+    in (x1, \dx1 -> dxt (dx1, zero))
+  a2 = \t -> let
+      ((_, x2), dxt) = a t
+    in (x2, \dx2 -> dxt (zero, dx2))
+
+temp :: LensD dt t (dx1, dx2) (x1, x2) -> (LensD dt t dx1 x1, LensD dt t dx2 x2)
+temp = undefined
+
+tupleArg :: (Additive dx1, Additive dx2) =>
+  ((LensD dt t dx1 x1, LensD dt t dx2 x2) -> y) -> LensD dt t (dx1, dx2) (x1, x2) -> y
+tupleArg f = f . lensToTuple
+
+vecToLens :: (Additive dt, KnownNat n) =>
+  Vec n (LensD dt t dx x) -> LensD dt t (Vec n dx) (Vec n x)
+vecToLens a = LensD $ \t -> let
+    (vec, dVecT) = unzip (fmap (\(LensD f) -> f t) a)
+  in (vec, \dVec -> sum (dVecT <*> dVec))
+
+instance -- (Additive (T x1), Additive (T x2)) => 
+  ToLens (x1, x2) t where
+    type ToLensMap (x1, x2) t = (DFunc t x1, DFunc t x2) -- -> DFunc t (x1, x2)
+    toLens :: Additive (T t) => 
+      (DFunc t x1, DFunc t x2) -> DFunc t (x1, x2) -- (DFunc t x1, DFunc t x1) -> DFunc t (x1, dx)
+    toLens = tupleToLens
+
+--temp1 :: Vec n (Int -> Int)
+--temp1 = undefined
+
+lensToVec :: forall dt t dx x n. (Additive dx, KnownNat n) =>
+  LensD dt t (Vec n dx) (Vec n x) -> Vec n (LensD dt t dx x)
+lensToVec (LensD a) = Data.Vector.Generic.Sized.generate $ \k ->
+  LensD (\t -> (let (v, dvt :: Vec n dx -> dt) = a t in (index v k, dvt . myBasisVector k zero)))
+
+vecNToLens :: (Additive dt, DVF.Arity n) =>
+  VFB.Vec n (LensD dt t dx x) -> LensD dt t (VFB.Vec n dx) (VFB.Vec n x)
+vecNToLens a = LensD $ \t -> let
+    (vec, dVecT) = unzip (fmap (\(LensD f) -> f t) a)
+  in (vec, \dVec -> sum (dVecT <*> dVec))
+
+--lensToVecN :: forall dt t dx x n. (Additive dx, DVF.Arity n) =>
+--  LensD dt t (VFB.Vec n dx) (VFB.Vec n x) -> VFB.Vec n (LensD dt t dx x)
+--lensToVecN (LensD a) = DVFC.generate $ \k ->
+--  LensD (\t -> (let (v, dvt :: VFB.Vec n dx -> dt) = a t in undefined)) -- (DVF.index v (Proxy k), dvt . myBasisVector k zero)))
+
+lensToVec2 :: forall dt t dx x. (Additive dx) =>
+  LensD dt t (VFB.Vec 2 dx) (VFB.Vec 2 x) -> VFB.Vec 2 (LensD dt t dx x)
+lensToVec2 (LensD a) = DVF.convert (LensD a1, LensD a2) where
+  a1 = \t -> let
+      (DVF.convert -> (x1, _), dxt) = a t
+    in (x1, \dx1 -> dxt (DVF.convert (dx1, zero)))
+  a2 = \t -> let
+      (DVF.convert -> (_, x2), dxt) = a t
+    in (x2, \dx2 -> dxt (DVF.convert (zero, dx2)))  
+
+--vec2Arg :: Additive dx =>
+--  (VFB.Vec 2 (LensD dt t dx x_) -> y) -> LensD dt t (VFB.Vec 2 dx) (VFB.Vec 2 x_) -> y
+vec2Arg :: Additive (T x) =>
+  (VFB.Vec 2 (DFunc t x) -> y) -> DFunc t (VFB.Vec 2 x) -> y
+vec2Arg f = f . lensToVec2
+
+class ToLens (a :: Type) (t :: Type) where
+  type ToLensMap a t :: Type
+  toLens :: Additive (T t) => ToLensMap a t -> DFunc t a
+
+lensToVec2Vec2 :: forall dt t dx x_. (Additive dx) =>
+  LensD dt t (VFB.Vec 2 (VFB.Vec 2 dx)) (VFB.Vec 2 (VFB.Vec 2 x_)) -> VFB.Vec 2 (VFB.Vec 2 (LensD dt t dx x_))
+lensToVec2Vec2 = fmap lensToVec2 . lensToVec2
+
+vecNVecNToLens :: (Additive dt, DVF.Arity n) =>
+  VFB.Vec n (VFB.Vec n (LensD dt t dx x)) -> LensD dt t (VFB.Vec n (VFB.Vec n dx)) (VFB.Vec n (VFB.Vec n x))
+vecNVecNToLens = vecNToLens . fmap vecNToLens
+
+--fmapPower n = case n of
+--  0 -> id 
+
+
+
 --functionToLens :: (r -> D dt t dx x) -> D dt t (dx, r) (r -> x)
 --functionToLens f = D $ \t ->
 --  (\r -> view (f r) t, \(dx, r) -> update (f r) t dx)
@@ -181,30 +294,39 @@ lensPtoC f = f identity
 ----derivativeOp :: (D dt t dx x -> D dt t dy y) -> x -> dy -> dx
 --derivativeOp f = update (f identity)
 
-fullDerivativeOp :: (DFunc x x -> DFunc x y) -> x -> (y, T y -> T x)
-fullDerivativeOp f = unpackLensD (f identity)
+derivativeOp :: (DFunc x x -> DFunc x y) -> x -> (y, T y -> T x)
+derivativeOp f = unpackLensD (f identity)
 
-derivativeOp :: (DFunc x x -> DFunc x y) -> (y -> T y) -> x -> T x
-derivativeOp f sb x = dyx (sb y) where
+derivativeOp_ :: (DFunc x x -> DFunc x y) -> (y -> T y) -> x -> T x
+derivativeOp_ f sb x = dyx (sb y) where
   (y, dyx) = unpackLensD (f identity) x
 
-derivative :: Basis y =>
+derivative :: Basis (T y) =>
   (DFunc x x -> DFunc x y) ->
   x ->
-  End y (T x)
-derivative f = basis . fullDerivativeOp f
+  End (T y) (T x)
+derivative f x = initBackProp (snd (derivativeOp f x))
 
-tupleDerivative :: forall x y1 y2. (
-    Multiplicative (T y1),
-    Multiplicative (T y2),
-    Additive (T y1),
-    Additive (T y2)
-  ) =>
-  (DFunc x x -> DFunc x (y1, y2)) -> x -> (T x, T x)
---tupleDerivative f x = (temp (const (one, zero)), temp (const (zero, one))) where
---  temp = (\sb -> derivativeOp f sb x) :: ((y1, y2) -> (Tangent y1, Tangent y2)) -> Tangent x
-tupleDerivative f x = tupleDual dyx where
-  (_, dyx) = fullDerivativeOp f x :: ((y1, y2), (T y1, T y2) -> T x)
+derivativeAndValue :: Basis (T y) =>
+  (DFunc x x -> DFunc x y) ->
+  x ->
+  (y, End (T y) (T x))
+derivativeAndValue f x = (y, initBackProp bp) where
+  (y, bp) = derivativeOp f x
+
+
+
+--tupleDerivative :: forall x y1 y2. (
+--    Multiplicative (T y1),
+--    Multiplicative (T y2),
+--    Additive (T y1),
+--    Additive (T y2)
+--  ) =>
+--  (DFunc x x -> DFunc x (y1, y2)) -> x -> (T x, T x)
+----tupleDerivative f x = (temp (const (one, zero)), temp (const (zero, one))) where
+----  temp = (\sb -> derivativeOp f sb x) :: ((y1, y2) -> (Tangent y1, Tangent y2)) -> Tangent x
+--tupleDerivative f x = tupleDual dyx where
+--  (_, dyx) = fullDerivativeOp f x :: ((y1, y2), (T y1, T y2) -> T x)
 
 --tripleDerivative :: (
 --    Multiplicative (Tangent y1),
@@ -230,19 +352,19 @@ tupleDerivative f x = tupleDual dyx where
   --enumerate = zip [0..]
   -- (y, dyx) = fullDerivativeOp f x
 
-listTupleDerivative :: forall x y1 y2. (
-    Multiplicative (T y1),
-    Multiplicative (T y2),
-    Additive (T y1),
-    Additive (T y2)
-  ) =>
-  (DFunc x x -> DFunc x [(y1, y2)]) -> x -> [(T x, T x)]
-listTupleDerivative f x = [(dyx (basisList1 i), dyx (basisList2 i)) | (i, _) <- enumerate y] where
-  basisList1 i = [if i == j then (one, zero) else zero | (j, _) <- enumerate y]
-  basisList2 i = [if i == j then (zero, one) else zero | (j, _) <- enumerate y]
-  enumerate = zip [0..]
-  (y, dyx) = fullDerivativeOp f x :: ([(y1, y2)], [(T y1, T y2)] -> T x)
--- listTupleDerivative f x = listDual $ (cross id unitDual) $ fullDerivativeOp f x
+--listTupleDerivative :: forall x y1 y2. (
+--    Multiplicative (T y1),
+--    Multiplicative (T y2),
+--    Additive (T y1),
+--    Additive (T y2)
+--  ) =>
+--  (DFunc x x -> DFunc x [(y1, y2)]) -> x -> [(T x, T x)]
+--listTupleDerivative f x = [(dyx (basisList1 i), dyx (basisList2 i)) | (i, _) <- enumerate y] where
+--  basisList1 i = [if i == j then (one, zero) else zero | (j, _) <- enumerate y]
+--  basisList2 i = [if i == j then (zero, one) else zero | (j, _) <- enumerate y]
+--  enumerate = zip [0..]
+--  (y, dyx) = fullDerivativeOp f x :: ([(y1, y2)], [(T y1, T y2)] -> T x)
+---- listTupleDerivative f x = listDual $ (cross id unitDual) $ fullDerivativeOp f x
 
 
 
@@ -297,18 +419,9 @@ listTupleDerivative f x = [(dyx (basisList1 i), dyx (basisList2 i)) | (i, _) <- 
 --    exp = lensCtoP expC
 --    log = lensCtoP logC
 --    (**) = undefined -- :: a -> a -> a
---
---sinhC :: (TrigField x, MultiplicativeAction x dx dx) => D dx x dx x
-----sinhC = D sinh (\x dy -> cosh x ..* dy)
---sinhC = D $ \x -> (sinh x, \dy -> cosh x ..* dy)
---coshC :: (TrigField x, MultiplicativeAction x dx dx) => D dx x dx x
-----coshC = D cosh (\x dy -> sinh x ..* dy)
---coshC = D $ \x -> (cosh x, \dy -> sinh x ..* dy)
---
---instance (TrigField x, MultiplicativeAction x dx dx, Distributive dx, Subtractive dx, Differentiable x dx) =>
---  TrigField (D dx x dx x) where
---    sinh = lensCtoP sinhC
---
+
+
+
 --
 --instance (TrigField a, TrigField b) =>
 --  TrigField (a, b) where
@@ -342,24 +455,87 @@ listTupleDerivative f x = [(dyx (basisList1 i), dyx (basisList2 i)) | (i, _) <- 
 example_0_0 = cosh (0.0 :: Float) :: Float
 -- example_0_1_ :: TrigField a => a -> Float -> a
 -- derivativeOp :: (DFunc x x -> DFunc x y) -> (y -> T y) -> x -> T x
-example_0_1_ = derivativeOp cosh :: (Float -> Float) -> Float -> Float -- :: Float
+example_0_1_ = derivativeOp_ cosh :: (Float -> Float) -> Float -> Float -- :: Float
 example_0_1 = derivative cosh :: Float -> Float
-example_0_2_ = derivative (derivative cosh) :: Float -> Float
-example_0_2 = unitDual . derivativeOp (unitDual . derivativeOp exp) :: Float -> Float
+example_0_2 = (derivative . derivative) cosh :: Float -> Float
+example_0_3 = (derivative . derivative . derivative) cosh :: Float -> Float
 
 
 ----example_0_1__ = functionToLens . (derivativeOp cosh) :: D dt t dx x -> D dt t (dx, Float) (Float -> x)
 ----example_0_2 = derivativeOpAuto cosh :: Float -> Float -> Float
 ----example_0_2 = (derivative . derivative) cosh (0.0 :: Float) :: Float
---
---example_1_0 = derivativeOp (tupleToLens . (\x -> (x, x))) :: Float -> (Float, Float) -> Float
+
+f1 = \x -> (x, x)
+-- derivativeOp :: (DFunc x x -> DFunc x y) -> x -> (y, T y -> T x)
+example_1_0 = derivativeOp (tupleToLens . f1) :: Float -> ((Float, Float), (Float, Float) -> Float)
+--example_1_0_ :: forall t x. (Additive x, Additive (T t)) => 
+--  DFunc t x -> ((DFunc t x, DFunc t x), (DFunc t x, DFunc t x) -> DFunc t x)
+example_1_0_ = snd . derivativeOp (tupleToLens . f1) :: Float -> (Float, Float) -> Float
+example_1_1 = derivative (tupleToLens . f1) :: Float -> (Float, Float)
+example_1_2 = derivative (tupleToLens . f1) :: DFunc Float Float -> (DFunc Float Float, DFunc Float Float)
+example_1_3 = derivative (tupleToLens . derivative (tupleToLens . f1)) :: Float -> (Float, Float)
+example_1_4 = (derivative . tupleValue) f1 :: Float -> (Float, Float)
+example_1_5 = ((derivative . tupleValue) . (derivative . tupleValue)) f1 :: Float -> (Float, Float)
+
+--example_1_1_ = derivative (tupleToLens . f1) :: forall t x. Additive (T x) => DFunc t x -> (DFunc t x, DFunc t x)
+--example_1_2 = derivative (derivative (tupleToLens . f1)) :: Float -> (Float, Float)
+-- example_1_0 = derivativeOp (tupleToLens . (\x -> (x, x))) :: Float -> (Float, Float) -> Float
 ---- example_1_1 = tupleDual (derivativeOp (tupleToLens . (\x -> (x, x)))) :: (Float -> Float, Float -> Float)
 --example_1_2 = tupleDual . derivativeOp (tupleToLens . (\x -> (x, x))) :: (Float -> (Float, Float))
---
---
---example_2_0 = derivativeOp (uncurry (+) . lensToTuple) :: (Float, Float) -> Float -> (Float, Float)
+
+f2 :: Additive x => (x, x) -> x
+f2 = uncurry (+)
+example_2_0 = derivativeOp (uncurry (+) . lensToTuple) :: (Float, Float) -> (Float, Float -> (Float, Float))
+example_2_1 = derivative (uncurry (+) . lensToTuple) :: (Float, Float) -> (Float, Float)
+example_2_2 = (derivative . tupleArg) f2 :: (Float, Float) -> (Float, Float)
+-- example_2_0 = derivativeOp (uncurry (+) . lensToTuple) :: (Float, Float) -> Float -> (Float, Float)
 --example_2_1 = unitDual . derivativeOp (uncurry (+) . lensToTuple) :: (Float, Float) -> (Float, Float)
---
+
+type SmallVec = VFB.Vec
+
+f3 :: Additive x => SmallVec 2 x -> x
+f3 (DVF.convert -> (x, y)) = x + y
+--example_3_0_ = f3 :: Additive x => VFB.Vec 2 (DFunc t x) -> DFunc t x
+example_3_1 = derivative (f3 . lensToVec2) :: SmallVec 2 Float -> SmallVec 2 Float
+example_3_1__ = customDerivative id lensToVec2 f3 :: SmallVec 2 Float -> SmallVec 2 Float
+
+example_3_2 = (derivative . vec2Arg) f3 :: SmallVec 2 Float -> SmallVec 2 Float
+example_3_2_ :: forall t. Additive (T t) => SmallVec 2 (DFunc t Float) -> SmallVec 2 (DFunc t Float)
+example_3_2_ = (derivative . vec2Arg) f3
+
+example_3_3 = derivative (vecNToLens . derivative (f3 . lensToVec2) . lensToVec2) :: SmallVec 2 Float -> SmallVec 2 (SmallVec 2 Float)
+example_3_3_ :: forall t. Additive (T t) => SmallVec 2 (DFunc t Float) -> SmallVec 2 (SmallVec 2 (DFunc t Float))
+example_3_3_ = derivative (vecNToLens . derivative (f3 . lensToVec2) . lensToVec2) -- :: VFB.Vec 2 Float -> VFB.Vec 2 (VFB.Vec 2 Float)
+example_3_3__ = customDerivative vecNToLens lensToVec2 $ customDerivative id lensToVec2 f3 :: SmallVec 2 Float -> SmallVec 2 (SmallVec 2 Float)
+
+example_3_4 = derivative (vecNVecNToLens . derivative (vecNToLens . derivative (f3 . lensToVec2) . lensToVec2) . lensToVec2) :: SmallVec 2 Float -> SmallVec 2 (SmallVec 2 (SmallVec 2 Float))
+example_3_4__ = customDerivative vecNVecNToLens lensToVec2 $ customDerivative vecNToLens lensToVec2 $ customDerivative id lensToVec2 f3 :: SmallVec 2 Float -> SmallVec 2 (SmallVec 2 (SmallVec 2 Float))
+
+--vecNToLens :: (Additive dt, DVF.Arity n) =>
+--  VFB.Vec n (LensD dt t dx x) -> LensD dt t (VFB.Vec n dx) (VFB.Vec n x)
+
+--derivative :: Basis (T y) =>
+--  (DFunc x x -> DFunc x y) ->
+--  x ->
+--  End (T y) (T x)
+
+--customDerivative :: Basis (T (v y)) =>
+--  (v (DFunc (w x) y) -> DFunc (w x) (v y)) -> 
+--  (DFunc (w x) (w x) -> w (DFunc (w x) x)) -> 
+--  (w (DFunc (w x) x) -> v (DFunc (w x) y)) -> 
+--  w x ->
+--  End (T (v y)) (T (w x))
+customDerivative :: Basis (T y) => 
+  (b -> DFunc x y) -> 
+  (DFunc x x -> a) -> 
+  (a -> b) -> 
+  x -> 
+  End (T y) (T x)
+customDerivative value arg f = derivative $ value . f . arg
+
+-- idArg :: DFunc t (w x) -> w (DFunc t x)
+
+
 --fff :: (Additive a, Multiplicative a) => (a, a, a) -> (a, a)
 --fff (x, y, z) = (x + y + z, x * y * z)
 --example_3_0 = derivativeOp (tupleToLens . fff . lensToTriple)

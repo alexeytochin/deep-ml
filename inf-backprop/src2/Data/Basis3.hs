@@ -2,8 +2,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 
-module Data.Basis2 where
+module Data.Basis3 where
 
 import Data.Proxy (Proxy(Proxy))
 import GHC.Base (Type, const)
@@ -16,17 +17,24 @@ import NumHask (Divisive, Additive, ExpField, (/), (^), (+), sqrt, Multiplicativ
 import Data.Stream (Stream, (<:>), repeat, iterate, map)
 
 import InfBackprop.Tangent (Tangent, T)
-import Data.Vector.Generic.Sized (Vector, replicate, generate)
+import Data.Vector.Generic.Sized (generate, replicate, Vector(..))
+--import Data.Vector.Generic (generate, replicate) --, Vector)
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector as DV
 import GHC.TypeNats (KnownNat)
 import Data.Finite.Internal (Finite)
-
+--import Numeric.LinearAlgebra.Static (R(..))
+import qualified Data.Vector.Fixed.Boxed as VFB
+-- import Data.Vector.Fixed.Boxed (Vec(..))
+import qualified Data.Vector.Fixed as VF
+import Data.Primitive.SmallArray (SmallArray(..))
+import Data.Vector.Fixed.Cont (Arity)
 
 class Basis (a :: Type) where -- | a -> ta
   type End (a :: Type) (b :: Type) :: Type
   initBackProp :: forall b. (a -> b) -> End a b
   zeroBackProp  :: a -- Proxy a -> T a
+--  toLens ::
 
 instance Basis Float where
   type End Float b = b
@@ -95,7 +103,12 @@ instance Basis a =>
 -- 
 --instance forall a b v. (Temp a) => VG.Vector v (End a b)
 
-type MyVector n a = Vector DV.Vector n a
+type Vec n a = Vector DV.Vector n a
+
+
+--temp :: VG.Vector -- Vec 2 Float
+--temp = Vector ()
+
 
 myBasisVector :: (VG.Vector v a, KnownNat n) => 
   Finite n -> a -> a -> Vector v n a
@@ -104,14 +117,44 @@ myBasisVector k zero' one' = generate $ \l ->
     then one'
     else zero' 
 
+
 instance (VG.Vector DV.Vector a, KnownNat n, Basis a) =>
-  Basis (MyVector n a) where
-    type End (MyVector n a) b = MyVector n (End a b)
-    initBackProp :: forall b. (MyVector n a -> b) -> MyVector n (End a b)
+  Basis (Vec n a) where
+    type End (Vec n a) b = Vec n (End a b)
+    initBackProp :: forall b. (Vec n a -> b) -> Vec n (End a b)
     initBackProp bp = generate (\k -> initBackProp (bp . myBasisVector k zeroBackProp))
-    zeroBackProp :: MyVector n a
+    zeroBackProp :: Vec n a
     zeroBackProp = replicate zeroBackProp
 
+
+tempV3 :: a -> VFB.Vec3 a
+tempV3 x = VF.convert (x, x, x)
+
+--myBasisVec3 ::
+--  Finite 2 -> a -> a -> VFB.Vec2 a
+--myBasisVec3 k zero' one' = case k of
+--  0 -> VFB.mk3 (one' zero')
+--  1 -> VFB.mk3 (zero' one')
+--  generate $ \l ->
+--  if k == l
+--    then one'
+--    else zero'
+
+instance (Additive a) => Additive (VFB.Vec 2 a) where
+  (+) = VF.zipWith (+)
+  zero = VF.replicate zero
+
+type instance Tangent (VFB.Vec n a) = VFB.Vec n (T a)
+
+--type family End (Vec 2 a) b = () --  VFB.Vec2 (End a b)
+--
+instance forall a. (Basis a) => 
+  Basis (VFB.Vec 2 a) where
+    type End (VFB.Vec 2 a) b = VFB.Vec 2 (End a b)
+    initBackProp :: forall b. (VFB.Vec 2 a -> b) -> VFB.Vec 2 (End a b)
+    initBackProp bp = VF.convert $ initBackProp (bp . VF.convert :: VFB.Vec 2 a -> b)                
+    zeroBackProp :: VFB.Vec 2 a
+    zeroBackProp = VF.convert (zeroBackProp, zeroBackProp)
 
 
 

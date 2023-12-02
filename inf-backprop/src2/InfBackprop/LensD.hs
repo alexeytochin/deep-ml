@@ -80,6 +80,28 @@ instance (Additive dx, Multiplicative y, y ~ dx) =>
         (y2, dyx2) = a2 x
       in (y1 * y2, \dy -> y2 * dyx1 dy + y1 * dyx2 dy)
 
+instance (Distributive dx, y ~ dx) => Distributive (LensD dx x dy y)
+
+--squareC :: (Additive x, Multiplicative x, T x ~ x) => -- , Diff x ~ x) =>
+--  DFunc x x
+--squareC = LensD $ \x -> (x * x, \dy -> two * x * dy)
+--
+----square :: (Additive x, Multiplicative x, T x ~ x) =>
+----  DP x x x x
+----square = lensCtoP squareC
+--
+--recipC :: (Divisive x, Subtractive x, T x ~ x) =>
+--  LensD x x x x
+--recipC = LensD $ \x -> (recip x, \dy -> negate $ recip x^2 * dy)
+--
+--instance (Divisive x, Subtractive dx, dx ~ x, T x ~ dx) =>
+--  Divisive (LensD dx x dx x) where
+--    recip = lensCtoP recipC
+--
+--instance (Field x) => 
+--  Field (LensD x x x x)
+
+
 
 -- DFunc
 type DFunc x y = LensD (T x) x (T y) y
@@ -96,13 +118,8 @@ constC_ c = LensD (const (c, const zero))
 instance (Basis a, Additive dt) =>
   Basis (LensD dt t da a) where
     type End (LensD dt t da a) b = End a b -- (LensD dt t (T b) b)
-    --    basis   :: forall b. (a, T a -> b) -> End a b
-    --    basis   :: forall b. (T a, T T a -> b) -> End (T a) b
+    --    basis   :: forall b. (a -> b) -> End a b
     initBackProp :: forall b. (LensD dt t da a -> b) -> End a b
-    initBackProp bp = basis ( bpLens (constC_ ()) where
-       -- . (view a)
-    --    mkZero  :: a -> T a
-    zeroBackProp :: LensD dt t da a -> LensD dt t (T da) (T a)
-    zeroBackProp (LensD lf) = LensD $ \t -> let
-        (y, _) = lf t 
-      in (mkZero y, const zero)
+    initBackProp bp = initBackProp (bp . constC_)
+    zeroBackProp :: LensD dt t da a
+    zeroBackProp = constC_ zeroBackProp

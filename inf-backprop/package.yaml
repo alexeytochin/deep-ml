@@ -35,6 +35,14 @@ dependencies:
   - transformers
   - comonad
   - simple-expr
+  - profunctors
+  - optics
+  - finite-typelits
+  - vector
+  - vector-sized
+  - fixed-vector
+  - primitive
+  - Stream
 
 ghc-options:
   - -Wall
@@ -48,7 +56,9 @@ ghc-options:
   - -Wredundant-constraints
 
 library:
-  source-dirs: src
+  source-dirs:
+    - src
+    - src2
   default-extensions:
     - NoImplicitPrelude
     - GADTs
