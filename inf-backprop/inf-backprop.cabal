@@ -44,8 +44,12 @@ library
       Prelude.InfBackprop
       Data.Basis2
       Data.Basis3
+      Data.FiniteList
       Data.Linear
       Data.Profunctor.Extra
+      Debug.DiffExpr
+      Debug.DiffVars
+      Debug.MutableSimplify
       InfBackprop.Common6
       InfBackprop.LensD
       InfBackprop.Tangent
@@ -70,13 +74,18 @@ library
       TupleSections
       FlexibleContexts
       DeriveFunctor
+      TypeOperators
+      BangPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       Stream
     , base >=4.7 && <5
     , comonad
+    , data-fix
+    , deepseq
     , finite-typelits
     , fixed-vector
+    , ghc-prim
     , isomorphism-class
     , monad-logger
     , numhask
@@ -102,9 +111,12 @@ test-suite doctests
       Stream
     , base >=4.7 && <5
     , comonad
+    , data-fix
+    , deepseq
     , doctest
     , finite-typelits
     , fixed-vector
+    , ghc-prim
     , isomorphism-class
     , monad-logger
     , numhask

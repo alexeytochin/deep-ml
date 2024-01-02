@@ -25,7 +25,7 @@ import Data.Profunctor (Profunctor, dimap, Strong, first', second', Costrong, un
 import Debug.SimpleExpr.Expr (number)
 import Data.Basis3 (Basis, initBackProp, zeroBackProp, End, Vec, myBasisVector)
 import Data.Linear (tupleDual, listDual)
-import InfBackprop.LensD (LensD(LensD), view, update, unpackLensD, DFunc)
+import InfBackprop.LensD (LensD(LensD), view, update, unpackLensD, DFunc, tupleToLens, lensToTuple, tupleValue)
 import InfBackprop.Tangent (T)
 import Prelude.Tools (fork)
 import Data.List.NonEmpty (unzip)
@@ -37,6 +37,9 @@ import qualified Data.Vector.Fixed.Boxed as VFB
 import qualified Data.Vector.Fixed.Cont as DVFC -- (Peano, generate)
 import qualified Data.Vector.Fixed as DVF --  Arity)
 import Data.Proxy (Proxy(Proxy))
+import InfBackprop.LensD (ToConst, stopDiff)
+import Data.Stream (Stream)
+import Data.FiniteList (FiniteList, zipWithStream, zipWithStream2)
 
 
 squareC :: (Additive x, Multiplicative x, T x ~ x) => -- , Diff x ~ x) =>
@@ -108,36 +111,8 @@ lensPtoC f = f identity
 
 
 
-tupleToLens :: Additive dt =>
-  (LensD dt t dx1 x1, LensD dt t dx2 x2) -> LensD dt t (dx1, dx2) (x1, x2)
--- tupleToLens (D v1 u1, D v2 u2) = D (\t -> (v1 t, v2 t)) (\t (dy1, dy2) -> u1 t dy1 + u2 t dy2)
-tupleToLens (LensD a1, LensD a2) = LensD $ \t -> let
-    (x1, dxt1) = a1 t
-    (x2, dxt2) = a2 t
-  in ((x1, x2), \(dx1, dx2) -> dxt1 dx1 + dxt2 dx2)
--- crossC3 (D v1 u1) (D v2 u2) = D (fork v1 v2) ()
 
-tupleToLens_ :: Additive (T t) =>
-  (DFunc t x1, DFunc t x2) -> DFunc t (x1, x2)
-tupleToLens_ = tupleToLens
 
-tupleValue :: Additive (T t) =>
-  (x -> (DFunc t x1, DFunc t x2)) -> x -> DFunc t (x1, x2)
-tupleValue f = tupleToLens_ . f
-
-lensToTuple :: (Additive dx1, Additive dx2) =>
-  LensD dt t (dx1, dx2) (x1, x2) -> (LensD dt t dx1 x1, LensD dt t dx2 x2)
--- lensToTuple (D v u) = (D (fst . v) (\t dy1 -> u t (dy1, zero)), D (snd . v) (\t dy2 -> u t (zero, dy2)))
-lensToTuple (LensD a) = (LensD a1, LensD a2) where
-  a1 = \t -> let
-      ((x1, _), dxt) = a t
-    in (x1, \dx1 -> dxt (dx1, zero))
-  a2 = \t -> let
-      ((_, x2), dxt) = a t
-    in (x2, \dx2 -> dxt (zero, dx2))
-
-temp :: LensD dt t (dx1, dx2) (x1, x2) -> (LensD dt t dx1 x1, LensD dt t dx2 x2)
-temp = undefined
 
 tupleArg :: (Additive dx1, Additive dx2) =>
   ((LensD dt t dx1 x1, LensD dt t dx2 x2) -> y) -> LensD dt t (dx1, dx2) (x1, x2) -> y
@@ -202,6 +177,28 @@ lensToVec2Vec2 = fmap lensToVec2 . lensToVec2
 vecNVecNToLens :: (Additive dt, DVF.Arity n) =>
   VFB.Vec n (VFB.Vec n (LensD dt t dx x)) -> LensD dt t (VFB.Vec n (VFB.Vec n dx)) (VFB.Vec n (VFB.Vec n x))
 vecNVecNToLens = vecNToLens . fmap vecNToLens
+
+streamToLens :: forall dt t dx x. (Additive dt) =>
+ Stream (LensD dt t dx x) -> LensD dt t (FiniteList dx) (Stream x)
+streamToLens streamOfLens = LensD $ \t -> let
+    (stream, dStreamT) = unzip (fmap (\(LensD f) -> f t) streamOfLens) :: (Stream x, Stream (dx -> dt))
+  in (stream :: Stream x, sum . zipWithStream id dStreamT :: FiniteList dx -> dt)
+ 
+finiteListToLens :: forall dt t dx x. (Additive dt) =>
+  FiniteList (LensD dt t dx x) -> LensD dt t (Stream dx) (FiniteList x)
+finiteListToLens finiteListOfLens = LensD $ \t -> let
+    (finiteList, dFiniteListT) = unzip (fmap (\(LensD f) -> f t) finiteListOfLens) :: (FiniteList x, FiniteList (dx -> dt))
+  in (finiteList :: FiniteList x, sum . zipWithStream2 id dFiniteListT :: Stream dx -> dt)
+
+
+
+--vecNToLens :: (Additive dt, DVF.Arity n) =>
+--  VFB.Vec n (LensD dt t dx x) -> LensD dt t (VFB.Vec n dx) (VFB.Vec n x)
+--vecNToLens a = LensD $ \t -> let
+--    (vec, dVecT) = unzip (fmap (\(LensD f) -> f t) a)
+--  in (vec, \dVec -> sum (dVecT <*> dVec))
+
+
 
 --fmapPower n = case n of
 --  0 -> id 
@@ -510,6 +507,64 @@ example_3_3__ = customDerivative vecNToLens lensToVec2 $ customDerivative id len
 
 example_3_4 = derivative (vecNVecNToLens . derivative (vecNToLens . derivative (f3 . lensToVec2) . lensToVec2) . lensToVec2) :: SmallVec 2 Float -> SmallVec 2 (SmallVec 2 (SmallVec 2 Float))
 example_3_4__ = customDerivative vecNVecNToLens lensToVec2 $ customDerivative vecNToLens lensToVec2 $ customDerivative id lensToVec2 f3 :: SmallVec 2 Float -> SmallVec 2 (SmallVec 2 (SmallVec 2 Float))
+
+
+f4 :: Multiplicative x => (x, x) -> x
+f4 = uncurry (*)
+--example_4_1 :: DFunc Float (Float, Float) -> DFunc Float Float
+example_4_0 :: DFunc Float (Float, Float) -> DFunc Float Float
+example_4_0 = f4 . lensToTuple -- (uncurry (*))
+example_4_1 :: (Float, Float) -> (Float, Float)
+example_4_1 = derivative (f4 . lensToTuple) -- (uncurry (*))
+example_4_2 :: (Float, Float) -> (Float, Float)
+example_4_2 = customDerivative id lensToTuple (uncurry (*))
+-- d_y (x * y) = snd ()
+
+diff2 :: (Basis (T a), Additive (T a), (T a, T a) ~ End (T a) (T a, T a)) =>
+  ((DFunc (a, a) a, DFunc (a, a) a) -> DFunc (a, a) a) ->
+  (a, a) ->
+  -- a -> a ->
+  --  (T a, T a)
+  End (T a) (T a, T a)
+diff2 = customDerivative id lensToTuple
+-- derivativeY :: (LensD (T (LensD Float Float Float Float), T (LensD Float Float Float Float)) (LensD Float Float Float Float, LensD Float Float Float Float) (T (LensD Float Float Float Float)) (LensD Float Float Float Float) -> LensD (T (LensD Float Float Float Float), T (LensD Float Float Float Float)) (LensD Float Float Float Float, LensD Float Float Float Float) (T (LensD Float Float Float Float)) (LensD Float Float Float Float) -> LensD (T (LensD Float Float Float Float), T (LensD Float Float Float Float)) (LensD Float Float Float Float, LensD Float Float Float Float) (T (LensD Float Float Float Float)) (LensD Float Float Float Float)) -> LensD Float Float Float Float -> LensD Float Float Float Float -> LensD Float Float (T Float) Float
+--  derivativeY :: forall a. (DFunc a a -> DFunc a a -> DFunc a a) -> (a -> a -> a)
+--derivativeY :: (End (T b) (T b, T b) ~ (a, c), Basis (T b), Additive (T b), Basis a, Additive a) =>  -- 
+--  (DFunc (b, b) b -> DFunc (b, b) b -> DFunc (b, b) b) -> b -> b -> c
+
+gradientTuple :: (End (T b) (T b, T b) ~ (T b, T b), Basis (T b), Additive (T b)) =>
+  (DFunc (b, b) b -> DFunc (b, b) b -> DFunc (b, b) b) ->
+  b ->
+  b ->
+  (T b, T b)
+gradientTuple f = curry $ diff2 (uncurry f)
+
+derivativeY :: (End (T b) (T b, T b) ~ (T b, T b), Basis (T b), Additive (T b)) =>
+  (DFunc (b, b) b -> DFunc (b, b) b -> DFunc (b, b) b) -> 
+  b -> 
+  b -> 
+  T b
+derivativeY f = curry $ snd . diff2 (uncurry f)   -- customDerivative id lensToTuple f
+-- temp :: Float -- forall x. (x, x) -> x
+--temp = \x -> (snd . diff2 (uncurry (*)))(x, stopDiff (2 :: Float))
+
+temp :: Float
+temp = derivative (\x -> x * derivativeY (*) x (stopDiff (2 :: Float))) (1 :: Float)
+
+temp2 = diff2 (uncurry (*)) :: (Float, Float) -> (Float, Float)
+temp3 = derivativeY (*) :: Float -> Float -> Float
+temp4 = derivativeY $ derivativeY (*) :: Float -> Float -> Float
+temp5 = (derivativeY . derivativeY) (*) :: Float -> Float -> Float
+
+
+
+-- temp11 = derivativeY (*) :: Float -> Float -> Float
+
+
+--setSnd :: a ->
+
+--example_3_1___ = (f4 . lensToTuple) :: DFunc Float (Float, Float) -> DFunc Float Float
+
 
 --vecNToLens :: (Additive dt, DVF.Arity n) =>
 --  VFB.Vec n (LensD dt t dx x) -> LensD dt t (VFB.Vec n dx) (VFB.Vec n x)

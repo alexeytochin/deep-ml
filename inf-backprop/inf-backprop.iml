@@ -112,5 +112,6 @@
     <orderEntry type="library" name="Only-0.1" level="project" />
     <orderEntry type="library" name="OneTuple-0.4.1.1" level="project" />
     <orderEntry type="library" name="fixed-vector-1.2.2.1" level="project" />
+    <orderEntry type="library" name="data-fix-0.3.2" level="project" />
   </component>
 </module>

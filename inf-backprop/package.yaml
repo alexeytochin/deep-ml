@@ -43,6 +43,9 @@ dependencies:
   - fixed-vector
   - primitive
   - Stream
+  - deepseq
+  - ghc-prim
+  - data-fix
 
 ghc-options:
   - -Wall
@@ -72,6 +75,8 @@ library:
     - TupleSections
     - FlexibleContexts
     - DeriveFunctor
+    - TypeOperators
+    - BangPatterns
 
 tests:
   doctests:

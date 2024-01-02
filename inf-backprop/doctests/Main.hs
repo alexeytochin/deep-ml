@@ -18,5 +18,6 @@ main =
       "-XTupleSections",
       "-XFlexibleContexts",
       "-XDeriveFunctor",
-      "src"
+      "-XBangPatterns",
+      "src2"
     ]

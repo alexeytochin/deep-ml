@@ -1,0 +1,178 @@
+-- {-# LANGUAGE AllowAmbiguousTypes #-}
+
+-- {-# LANGUAGE UndecidableInstances #-}
+
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+module Data.Basis4 where
+
+import Data.Proxy (Proxy(Proxy))
+import GHC.Base (Type, const)
+import Prelude (Float, undefined, fmap, fst, zip, (==), snd, ($), (.))
+import NumHask.Algebra.Additive (zero)
+import GHC.Natural (Natural)
+import Control.Monad (void)
+import NumHask (Divisive, Additive, ExpField, (/), (^), (+), sqrt, Multiplicative, (*), (-), Distributive, Subtractive, 
+  (-), one)
+import Data.Stream (Stream, (<:>), repeat, iterate, map)
+
+import InfBackprop.Tangent (Tangent, T)
+import Data.Vector.Generic.Sized (generate, replicate, Vector(..))
+--import Data.Vector.Generic (generate, replicate) --, Vector)
+import qualified Data.Vector.Generic as VG
+import qualified Data.Vector as DV
+import GHC.TypeNats (KnownNat)
+import Data.Finite.Internal (Finite)
+--import Numeric.LinearAlgebra.Static (R(..))
+import qualified Data.Vector.Fixed.Boxed as VFB
+-- import Data.Vector.Fixed.Boxed (Vec(..))
+import qualified Data.Vector.Fixed as VF
+import Data.Primitive.SmallArray (SmallArray(..))
+import Data.Vector.Fixed.Cont (Arity)
+import Debug.SimpleExpr (SimpleExpr)
+import Data.FiniteList (FiniteList)
+import Control.Category (Category, (.), id)
+import qualified Prelude as P
+
+class Reflective a 
+
+
+--type family Dual (a :: Type) :: Type
+
+--type instance Dual (a, b) = (Dual a, Dual b)
+--type instance Dual (Stream a) = FiniteList a
+--type instance Dual (FiniteList a) = Stream a
+
+class HasDual (a :: Type) where
+  type Dual a :: Type
+  type Field a :: Type
+  type Basis a f :: Type
+  conv :: Dual a -> a -> Field a
+
+--class HasDual (field :: Type) (a :: Type) | a -> field where
+--  type Dual a :: Type
+--  -- type Field a :: Type
+--  type Basis a f :: Type
+--  conv :: Dual a -> a -> field
+
+--class HasDual (a :: Type -> Type) where
+--  type (Dual a) (f :: Type) :: Type
+--  -- type Field a :: Type
+--  -- type Basis a f :: Type
+--  conv :: Distributive f => Dual a f -> a f -> f
+
+
+--class Duable (a :: Type -> Type) where
+--  type Dual a f :: Type
+  -- type Basis (a :: Type) (b :: Type) :: Type
+  -- from_basis :: forall b. DualBasis a b -> (a -> b)
+  -- identity :: DualBasis a a
+
+instance HasDual Float where
+  type Dual Float = Float
+  type Field Float = Float
+  type Basis Float f = Float
+  conv = (*)
+
+--instance HasDual Float Float where
+--  type Dual Float = Float
+--  type Basis Float f = Float
+--  conv = (*)
+
+--type Tuple a = (a, a)
+
+--instance (Additive (Field a1), HasDual a1, HasDual a2, Field a1 ~ Field a2) =>
+instance (Additive (Field a1), HasDual a1, HasDual a2, Field a1 ~ Field a2) =>
+  HasDual (a1, a2) where
+    type Dual (a1, a2) = (Dual a1, Dual a2)
+    type Field (a1, a2) = Field a1
+    type Basis (a1, a2) f = (Basis a1 f, Basis a2 f)
+    conv (da1, da2) (a1, a2) = conv da1 a1 + conv da2 a2
+
+--instance (Additive field, HasDual field a1, HasDual field a2) =>
+--  HasDual field (a1, a2) where
+--    type Dual (a1, a2) = (Dual a1, Dual a2)
+--    -- type Field (a1, a2) = Field a1
+--    type Basis (a1, a2) f = (Basis a1 f, Basis a2 f)
+--    conv (da1, da2) (a1, a2) = conv da1 a1 + conv da2 a2
+
+instance HasDual (a :: Type) =>
+  HasDual (Stream a) where
+    type Dual (Stream a) = FiniteList a
+    type Field (Stream a) = Field a
+    type Basis (Stream a) f = Stream (Basis a f) 
+    conv da a = undefined
+
+instance HasDual (a :: Type) =>
+  HasDual (FiniteList a) where
+    type Dual (FiniteList a) = (Stream a)
+    type Field (FiniteList a) = Field a
+    type Basis (FiniteList a) f = FiniteList (Basis a f) 
+    conv da a = undefined
+
+--instance HasDual field (a :: Type) =>
+--  HasDual field (Stream a) where
+--    type Dual (Stream a) = FiniteList a
+--    -- type Field (Stream a) = Field a
+--    type Basis (Stream a) f = Stream (Basis a f) 
+--    conv da a = undefined
+--
+--instance HasDual field (a :: Type) =>
+--  HasDual field (FiniteList a) where
+--    type Dual (FiniteList a) = (Stream a)
+--    -- type Field (FiniteList a) = Field a
+--    conv da a = undefined
+
+data LinearFunctional a = UnsafeMkLinearFunctional {
+    act :: a -> Field a, 
+    basisF :: Dual a --Basis a (Field a)
+  }
+
+--data LinearFunctional f a = UnsafeMkLinearFunctional {
+--    act :: a -> f, 
+--    basis :: Basis a f
+--  }
+
+
+--data LinearOp a b = UnsafeMkLinearOp {
+--    call :: a -> b, -- (,,) -> (,)   DualBasis = ((,),(,),(,))
+--    conjugate :: Dual b -> Dual a,
+--    basis :: Basis b (LinearOp a (Field b))
+--    -- dualBbasis :: forall c. Basis c a -> Basis c b
+--  }
+
+data LinearOp a b = UnsafeMkLinearOp {
+    call :: a -> b, -- (,,) -> (,)   DualBasis = ((,),(,),(,))
+    conjugate :: Dual b -> Dual a
+    --basisOp1 ::  Basis b (LinearOp a (Field b)),
+    -- basisOp2 ::  Basis (Dual a) b
+    -- dualBbasis :: forall c. Basis c a -> Basis c b
+  }
+
+dualOp :: forall a b. (Field a ~ Field b) => 
+  LinearOp a b -> LinearFunctional b -> LinearFunctional a
+dualOp lOp lF = UnsafeMkLinearFunctional (act lF P.. call lOp) (conjugate lOp (basisF lF))
+
+
+-- initBackProp :: forall b. (a -> b) -> End a b
+
+-- linerOpBasis :: LinearOp a b ->
+
+--instance (Additive b, Additive (Dual a), Additive (Basis b (LinearOp a (Field b)))) =>
+--  Additive (LinearOp a b) where
+--    zero = UnsafeMkLinearOp (const zero) (const zero) zero
+--    UnsafeMkLinearOp call1 con1 bas1 + UnsafeMkLinearOp call2 con2 bas2 = UnsafeMkLinearOp (call1 + call2) (con1 + con2) (bas1 + bas2)
+
+
+instance Category LinearOp where
+--  id = undefined -- UnsafeMkLinearOp id id id
+--  UnsafeMkLinearOp f1 g1 b1 d1 . UnsafeMkLinearOp f2 g2 b2 d2 =
+--    UnsafeMkLinearOp (f1 P.. f2) (g2 P.. g1) () ()
+
+-- Stream
+streamBasis :: a -> a -> Stream (Stream a)
+streamBasis zero' one' = iterate (zero' <:>) (one' <:> repeat zero')
+
+streamBasis2 :: a -> a -> Stream (FiniteList a)
+streamBasis2 zero' one' = undefined -- iterate (zero' <:>) (one' <:> repeat zero')

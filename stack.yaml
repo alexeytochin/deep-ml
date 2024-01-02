@@ -3,3 +3,8 @@ resolver: lts-21.6 # ghc 9.4.5
 packages:
   - inf-backprop
   - simple-expr
+
+extra-deps:
+#  - hood-0.3.1
+#  - mutable-0.2.2.0
+

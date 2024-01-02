@@ -13,7 +13,7 @@ import NumHask.Algebra.Additive (zero)
 import GHC.Natural (Natural)
 import Control.Monad (void)
 import NumHask (Divisive, Additive, ExpField, (/), (^), (+), sqrt, Multiplicative, (*), (-), Distributive, Subtractive, 
-  (-))
+  (-), one)
 import Data.Stream (Stream, (<:>), repeat, iterate, map)
 
 import InfBackprop.Tangent (Tangent, T)
@@ -29,6 +29,8 @@ import qualified Data.Vector.Fixed.Boxed as VFB
 import qualified Data.Vector.Fixed as VF
 import Data.Primitive.SmallArray (SmallArray(..))
 import Data.Vector.Fixed.Cont (Arity)
+import Debug.SimpleExpr (SimpleExpr)  
+
 
 class Basis (a :: Type) where -- | a -> ta
   type End (a :: Type) (b :: Type) :: Type
@@ -64,6 +66,20 @@ instance (Basis a0, Basis a1, Basis a2) =>
     zeroBackProp :: (a0, a1, a2)
     zeroBackProp = (zeroBackProp, zeroBackProp, zeroBackProp)
 
+---- functions
+--instance forall r a. (Basis a) =>
+--  Basis (r -> a) where
+--    type End (r -> a) b = r -> End a b
+--    initBackProp :: ((r -> a) -> b) -> (r -> End a b)
+--    initBackProp bp = \r -> initBackProp 
+----     (
+----        initBackProp (\a1 -> bp (a1, zeroBackProp)),
+----        initBackProp (\a2 -> bp (zeroBackProp, a2))
+----      )
+--    zeroBackProp :: (a1, a2)
+--    zeroBackProp = (zeroBackProp, zeroBackProp)
+
+
 enumlist :: [a] -> [()]
 enumlist = void
 
@@ -87,6 +103,8 @@ enumerateList = zip [(0 :: Natural) ..]
 --listDual :: (Multiplicative a, Additive a) =>
 --  ([()], [a] -> b) -> [b]
 --listDual (l, f) = [unitDual (\x -> f (basisList x i l)) | i <- counter l]
+
+-- type instance Tangent (Stream a) = undefined --  VFB.Vec n (T a)
 
 instance Basis a =>
   Basis (Stream a) where
@@ -156,6 +174,34 @@ instance forall a. (Basis a) =>
     zeroBackProp :: VFB.Vec 2 a
     zeroBackProp = VF.convert (zeroBackProp, zeroBackProp)
 
+type instance Tangent SimpleExpr = SimpleExpr
+
+instance Basis SimpleExpr where
+  type End SimpleExpr b = b
+  initBackProp f = f one
+  zeroBackProp = zero
+
+--instance SimpleExpr => 
+--  Basis SimpleExpr where
+--    type End SimpleExpr b = SimpleExpr
+--    initBackProp :: forall b. (SimpleExpr -> b) -> SimpleExpr
+--    initBackProp bp = VF.convert $ initBackProp (bp . VF.convert :: VFB.Vec 2 a -> b)                
+--    zeroBackProp :: VFB.Vec 2 a
+--    zeroBackProp = VF.convert (zeroBackProp, zeroBackProp)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 --myBasis1 :: (((Float, Float, Float), (Float, Float, Float)), ((Float, Float, Float), (Float, Float, Float)) -> b) -> ((b, b, b), (b, b, b))
@@ -191,7 +237,6 @@ instance Additive a =>
 instance Subtractive a =>
   Subtractive (Vector3 a) where
     (Vector3 ax ay az) - (Vector3 bx by bz) = Vector3 (ax - bx) (ay - by) (az - bz)
-
 
 vector3Dot :: (Distributive a) => 
   Vector3 a -> Vector3 a -> a
