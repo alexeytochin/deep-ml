@@ -46,6 +46,7 @@ dependencies:
   - deepseq
   - ghc-prim
   - data-fix
+  - safe
 
 ghc-options:
   - -Wall

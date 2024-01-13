@@ -44,6 +44,7 @@ library
       Prelude.InfBackprop
       Data.Basis2
       Data.Basis3
+      Data.BoundedFix
       Data.FiniteList
       Data.Linear
       Data.Profunctor.Extra
@@ -92,6 +93,7 @@ library
     , optics
     , primitive
     , profunctors
+    , safe
     , simple-expr
     , text
     , transformers
@@ -123,6 +125,7 @@ test-suite doctests
     , optics
     , primitive
     , profunctors
+    , safe
     , simple-expr
     , text
     , transformers
