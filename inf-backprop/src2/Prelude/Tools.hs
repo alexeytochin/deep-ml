@@ -1,4 +1,4 @@
-module Prelude.Tools where
+module Prelude.Tools (cross, fork, pureKleisli) where
 
 import Control.Arrow (Kleisli(Kleisli))
 import Prelude (Monad, pure, (.), ($))

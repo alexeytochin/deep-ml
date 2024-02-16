@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFoldable #-}
 
-module BoundedFix where
+module Data.BoundedFix where
 
 import Data.Fix (Fix(Fix, unFix))
 import GHC.Natural (Natural)

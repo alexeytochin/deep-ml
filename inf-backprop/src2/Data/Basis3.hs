@@ -30,6 +30,7 @@ import qualified Data.Vector.Fixed as VF
 import Data.Primitive.SmallArray (SmallArray(..))
 import Data.Vector.Fixed.Cont (Arity)
 import Debug.SimpleExpr (SimpleExpr)  
+import Data.FiniteList (FiniteList, emptyFiniteList, unit, join)
 
 
 class Basis (a :: Type) where -- | a -> ta
@@ -109,12 +110,26 @@ enumerateList = zip [(0 :: Natural) ..]
 instance Basis a =>
   Basis (Stream a) where
     type End (Stream a) b = Stream (End a b)
-    -- initBackProp :: (a -> b) -> End a b
+    -- initBackProp :: forall b. (a -> b) -> End a b
     initBackProp :: forall b. (Stream a -> b) -> Stream (End a b)
     initBackProp bp = map (\mkStream -> initBackProp (bp . mkStream)) mkStreams where
       mkStreams = iterate (\s a -> zeroBackProp <:> s a) (\a -> a <:> repeat zeroBackProp) :: Stream (a -> Stream a)
+
     zeroBackProp :: Stream a
     zeroBackProp = repeat zeroBackProp
+
+instance Basis a =>
+  Basis (FiniteList a) where
+    type End (FiniteList a) b = Stream (End a b)
+
+    initBackProp :: forall b. (FiniteList a -> b) -> Stream (End a b)
+    initBackProp bp = map (\mkStream -> initBackProp (bp . mkStream)) mkFiniteLists where
+      mkFiniteLists = iterate (\s a -> join zeroBackProp (s a)) unit :: Stream (a -> FiniteList a)
+        
+    zeroBackProp :: FiniteList a
+    zeroBackProp = emptyFiniteList
+
+
 
 
 --class Temp a

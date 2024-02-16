@@ -5,6 +5,8 @@ module Data.FiniteList (
     FiniteList,
     getList,
     length,
+    unit,
+    join,
     emptyFiniteList,
     consFiniteList,
     zipWithStream,

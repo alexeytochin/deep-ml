@@ -3,3 +3,6 @@ resolver: lts-20.18 # ghc 9.2.7
 packages:
   - inf-backprop
   - simple-expr
+
+extra-deps:
+  - unordered-containers-0.2.2

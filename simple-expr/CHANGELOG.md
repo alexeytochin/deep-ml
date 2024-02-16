@@ -14,3 +14,11 @@
 ### Fixed
 
 * Compatibility up to LTS 21.6
+
+## [0.2.0.0] -- 2024-02-10
+
+### Changed
+
+* Removed `BinaryFuncF`
+* Switched form `String` to `Text`
+* Instances of  `FromIntegral` for `SimpleExpr` types.

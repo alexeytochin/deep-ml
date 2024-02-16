@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           simple-expr
-version:        0.1.1.0
+version:        0.2.0.0
 synopsis:       Minimalistic toolkit for simple mathematical expression.
 description:    This is a minimalistic toolkit for simple mathematical expression developed for debug purposes similar to
                 'simple-reflect' package
@@ -26,7 +26,7 @@ description:    This is a minimalistic toolkit for simple mathematical expressio
 category:       Mathematics
 author:         Alexey Tochin
 maintainer:     Alexey.Tochin@gmail.com
-copyright:      2023 Alexey Tochin
+copyright:      2024 Alexey Tochin
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple

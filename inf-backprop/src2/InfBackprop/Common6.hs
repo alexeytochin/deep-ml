@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FunctionalDependencies #-}
 --{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE PolyKinds #-}
@@ -8,90 +7,39 @@
 
 module InfBackprop.Common6 where
 
-import Prelude ((.), id, fst, snd, uncurry, curry, ($), undefined, const, fmap, Functor, (<*>))
+import Prelude ((.), id, fst, snd, uncurry, curry, ($), undefined, const, fmap, Functor, (<*>), show)
 import Prelude hiding (sinh, cosh, (*), (+), (-), negate, recip, exp, (^), (^^), (/), log, sqrt, unzip, sum)
 -- import qualified Prelude as P
 import NumHask ((*), (+), sin, cos, Additive, zero, sum, Multiplicative, one, ExpField, exp, log, (**), sqrt, sinh, cosh,
   Subtractive, negate, (-),
   Divisive, recip, (/), Field, AdditiveAction, (^), (^^), TrigField, two, Distributive, Integral)
 -- import qualified NumHask as NH (sqrt, sinh, cosh)
-import Data.Bifunctor (bimap)
 import GHC.Base (Type)
-import NumHask.Prelude (Float, flip)
-import Data.Void (Void, absurd)
-import Data.Profunctor.Extra (Outer, (***), outer)
-import Data.Profunctor (Profunctor, dimap, Strong, first', second', Costrong, unfirst, unsecond)
 
-import Debug.SimpleExpr.Expr (number)
-import Data.Basis3 (Basis, initBackProp, zeroBackProp, End, Vec, myBasisVector)
-import Data.Linear (tupleDual, listDual)
-import InfBackprop.LensD (LensD(LensD), view, update, unpackLensD, DFunc, tupleToLens, lensToTuple, tupleValue)
+import Data.Basis3 (Basis, initBackProp, End, Vec, myBasisVector)
+import Data.Linear ()
 import InfBackprop.Tangent (T)
-import Prelude.Tools (fork)
 import Data.List.NonEmpty (unzip)
 import GHC.TypeLits (KnownNat)
-import Data.Vector.Generic.Sized (index, generate, Vector(..))
+import Data.Vector.Generic.Sized (index, generate)
 --import Data.Vector.Generic ((!))
 import qualified Data.Vector.Fixed.Boxed as VFB
 --import Data.Vector.Generic (generate)
-import qualified Data.Vector.Fixed.Cont as DVFC -- (Peano, generate)
 import qualified Data.Vector.Fixed as DVF --  Arity)
-import Data.Proxy (Proxy(Proxy))
-import InfBackprop.LensD (ToConst, stopDiff)
+import InfBackprop.LensD (stopDiff, DFunc, LensD(LensD), tupleToLens, lensToTuple, 
+  tupleLensIso', dId, identity, unpackLensD)
 import Data.Stream (Stream)
 import Data.FiniteList (FiniteList, zipWithStream, zipWithStream2)
-
-
-squareC :: (Additive x, Multiplicative x, T x ~ x) => -- , Diff x ~ x) =>
-  DFunc x x
-squareC = LensD $ \x -> (x * x, \dy -> two * x * dy)
-
---square :: (Additive x, Multiplicative x, T x ~ x) =>
---  DP x x x x
---square = lensCtoP squareC
-
-recipC :: (Divisive x, Subtractive x, T x ~ x) =>
-  DFunc x x
-recipC = LensD $ \x -> (recip x, \dy -> negate $ recip x^2 * dy)
-
---instance (Distributive dx, y ~ dx) => 
---  Divisive (LensD dx x dy y) where
---    recip = lensCtoP recipC
-
-instance (Divisive x, Subtractive dx, dx ~ x, T x ~ dx) =>
-  Divisive (LensD dx x dx x) where
-    recip = lensCtoP recipC
-
-instance (Field x, x ~ T x) => 
-  Field (LensD x x x x)
-
-sinhC :: (TrigField x, x ~ T x) => DFunc x x
-sinhC = LensD $ \x -> (sinh x, \dy -> cosh x * dy)
-
-coshC :: (TrigField x, x ~ T x) => DFunc x x
-coshC = LensD $ \x -> (cosh x, \dy -> sinh x * dy)
-
-instance (TrigField x, x ~ T x) =>
-  TrigField (LensD x x x x) where
-    sinh = lensCtoP sinhC
+import IsomorphismClass (IsomorphicTo, to)
+--import Optics (Iso', iso, view, review)
+import qualified Optics as O
 
 
 
 
--- DP
-type DP dx x dy y = forall p. Costrong p => p dx x -> p dy y
 
-identity :: LensD a b a b
-identity = LensD (, id)
 
-lensCtoP :: LensD dx x dy y -> DP dx x dy y
--- lensCtoP (D v u) = unsecond . dimap (uncurry u) (fork id v)
-lensCtoP l = unsecond . dimap (uncurry u) (fork id v) where
-  v = view l
-  u = update l
 
-lensPtoC :: DP dx x dy y -> LensD dx x dy y
-lensPtoC f = f identity
 
 
 
@@ -108,8 +56,40 @@ lensPtoC f = f identity
 
 
 
+instance (Additive da0, Additive da1, Additive dt) =>
+  IsomorphicTo (LensD dt t (da0, da1) (a0, a1)) (LensD dt t da0 a0, LensD dt t da1 a1) where
+    to = tupleToLens
 
+instance (Additive da0, Additive da1, Additive dt) =>
+  IsomorphicTo (LensD dt t da0 a0, LensD dt t da1 a1) (LensD dt t (da0, da1) (a0, a1)) where
+    to = lensToTuple
 
+class Lensable da a where
+  type LensType dt t da a :: Type
+  arg :: Additive dt =>
+    LensType dt t da a -> LensD dt t da a
+  value :: LensD dt t da a -> LensType dt t da a
+  iso' :: (Additive dt) => 
+    O.Iso' (LensD dt t da a) (LensType dt t da a)
+
+--instance (Additive da) =>
+--  Lensable da a where
+--    type LensType dt t da a = LensD dt t da a
+--    arg = undefined
+--    value = undefined
+--    iso' = undefined
+
+--instance (Additive da0, Additive da1) =>
+--  Lensable (da0, da1) (a0, a1) where
+--    type LensType dt t (da0, da1) (a0, a1) = (LensD dt t da0 a0, LensD dt t da1 a1)
+--    arg = tupleToLens
+--    value = lensToTuple
+--    iso' = dTuple
+
+-- example_2_3 = customDerivative id lensToTuple f2 :: (Float, Float) -> (Float, Float)
+example_2_3 = customDerivative id (O.view tupleLensIso') f2 :: (Float, Float) -> (Float, Float)
+example_2_3' = customDerivative (O.review dId) (O.view tupleLensIso') f2 :: (Float, Float) -> (Float, Float)
+example_2_4 = customDerivative' dId tupleLensIso' f2 :: (Float, Float) -> (Float, Float)
 
 
 
@@ -177,6 +157,8 @@ lensToVec2Vec2 = fmap lensToVec2 . lensToVec2
 vecNVecNToLens :: (Additive dt, DVF.Arity n) =>
   VFB.Vec n (VFB.Vec n (LensD dt t dx x)) -> LensD dt t (VFB.Vec n (VFB.Vec n dx)) (VFB.Vec n (VFB.Vec n x))
 vecNVecNToLens = vecNToLens . fmap vecNToLens
+
+
 
 streamToLens :: forall dt t dx x. (Additive dt) =>
  Stream (LensD dt t dx x) -> LensD dt t (FiniteList dx) (Stream x)
@@ -291,26 +273,35 @@ finiteListToLens finiteListOfLens = LensD $ \t -> let
 ----derivativeOp :: (D dt t dx x -> D dt t dy y) -> x -> dy -> dx
 --derivativeOp f = update (f identity)
 
-derivativeOp :: (DFunc x x -> DFunc x y) -> x -> (y, T y -> T x)
+derivativeOp :: -- Additive (T x) => 
+--  (forall t. (Additive (T t)) => DFunc t x -> DFunc t y) -> 
+  (DFunc x x -> DFunc x y) -> 
+  x -> 
+  (y, T y -> T x)
 derivativeOp f = unpackLensD (f identity)
 
-derivativeOp_ :: (DFunc x x -> DFunc x y) -> (y -> T y) -> x -> T x
+derivativeOp_ :: -- Additive (T x) => 
+--  (forall t. Additive (T t) => DFunc t x -> DFunc t y) -> 
+  (DFunc x x -> DFunc x y) -> 
+  (y -> T y) -> 
+  x -> 
+  T x
 derivativeOp_ f sb x = dyx (sb y) where
-  (y, dyx) = unpackLensD (f identity) x
+  (y, dyx) = derivativeOp f x
 
-derivative :: Basis (T y) =>
+derivative :: Basis (T y) => -- (Basis (T y), Additive (T x)) =>
+--  (forall t. Additive (T t) => DFunc t x -> DFunc t y) ->
   (DFunc x x -> DFunc x y) ->
   x ->
   End (T y) (T x)
 derivative f x = initBackProp (snd (derivativeOp f x))
 
-derivativeAndValue :: Basis (T y) =>
-  (DFunc x x -> DFunc x y) ->
+derivativeAndValue :: Basis (T y) => -- (Basis (T y), Additive (T x)) =>
+  (forall t. DFunc t x -> DFunc t y) ->
   x ->
   (y, End (T y) (T x))
 derivativeAndValue f x = (y, initBackProp bp) where
   (y, bp) = derivativeOp f x
-
 
 
 --tupleDerivative :: forall x y1 y2. (
@@ -418,6 +409,18 @@ derivativeAndValue f x = (y, initBackProp bp) where
 --    (**) = undefined -- :: a -> a -> a
 
 
+--example3 :: (forall a. a) -> Bool
+--example3 x = True
+--
+--example2 :: Show a => a -> Int
+--example2 x = length (show x)
+
+--g' :: (forall a. a -> a) -> b
+--g' _ = undefined
+--
+--f' :: (Int -> Int) -> b
+--f' = \x' -> g' x'
+
 
 --
 --instance (TrigField a, TrigField b) =>
@@ -471,8 +474,8 @@ example_1_0_ = snd . derivativeOp (tupleToLens . f1) :: Float -> (Float, Float) 
 example_1_1 = derivative (tupleToLens . f1) :: Float -> (Float, Float)
 example_1_2 = derivative (tupleToLens . f1) :: DFunc Float Float -> (DFunc Float Float, DFunc Float Float)
 example_1_3 = derivative (tupleToLens . derivative (tupleToLens . f1)) :: Float -> (Float, Float)
-example_1_4 = (derivative . tupleValue) f1 :: Float -> (Float, Float)
-example_1_5 = ((derivative . tupleValue) . (derivative . tupleValue)) f1 :: Float -> (Float, Float)
+--example_1_4 = (derivative . lensToTuple) f1 :: Float -> (Float, Float)
+--example_1_5 = ((derivative . tupleValue) . (derivative . tupleValue)) f1 :: Float -> (Float, Float)
 
 --example_1_1_ = derivative (tupleToLens . f1) :: forall t x. Additive (T x) => DFunc t x -> (DFunc t x, DFunc t x)
 --example_1_2 = derivative (derivative (tupleToLens . f1)) :: Float -> (Float, Float)
@@ -487,6 +490,11 @@ example_2_1 = derivative (uncurry (+) . lensToTuple) :: (Float, Float) -> (Float
 example_2_2 = (derivative . tupleArg) f2 :: (Float, Float) -> (Float, Float)
 -- example_2_0 = derivativeOp (uncurry (+) . lensToTuple) :: (Float, Float) -> Float -> (Float, Float)
 --example_2_1 = unitDual . derivativeOp (uncurry (+) . lensToTuple) :: (Float, Float) -> (Float, Float)
+
+--example_2_3 = customDerivative id lensToTuple f2 :: (Float, Float) -> (Float, Float)
+
+
+
 
 type SmallVec = VFB.Vec
 
@@ -518,6 +526,8 @@ example_4_1 :: (Float, Float) -> (Float, Float)
 example_4_1 = derivative (f4 . lensToTuple) -- (uncurry (*))
 example_4_2 :: (Float, Float) -> (Float, Float)
 example_4_2 = customDerivative id lensToTuple (uncurry (*))
+--example_4_3 = customDerivative' id lensToTuple (uncurry (*))
+--example_4_3 = customDerivative' id lensToTuple (uncurry (*))
 -- d_y (x * y) = snd ()
 
 diff2 :: (Basis (T a), Additive (T a), (T a, T a) ~ End (T a) (T a, T a)) =>
@@ -538,6 +548,13 @@ gradientTuple :: (End (T b) (T b, T b) ~ (T b, T b), Basis (T b), Additive (T b)
   b ->
   (T b, T b)
 gradientTuple f = curry $ diff2 (uncurry f)
+
+derivativeX :: (End (T b) (T b, T b) ~ (T b, T b), Basis (T b), Additive (T b)) =>
+  (DFunc (b, b) b -> DFunc (b, b) b -> DFunc (b, b) b) -> 
+  b -> 
+  b -> 
+  T b
+derivativeX f = curry $ fst . diff2 (uncurry f)   -- customDerivative id lensToTuple f
 
 derivativeY :: (End (T b) (T b, T b) ~ (T b, T b), Basis (T b), Additive (T b)) =>
   (DFunc (b, b) b -> DFunc (b, b) b -> DFunc (b, b) b) -> 
@@ -587,6 +604,22 @@ customDerivative :: Basis (T y) =>
   x -> 
   End (T y) (T x)
 customDerivative value arg f = derivative $ value . f . arg
+
+customDerivative' :: Basis (T y) => 
+  O.Iso' (LensD (T x) x (T y) y) b -> 
+  O.Iso' (LensD (T x) x (T x) x) a -> 
+  (a -> b) -> 
+  x -> 
+  End (T y) (T x)
+customDerivative' isoIn isoOut f = derivative $ O.review isoIn . f . O.view isoOut
+
+--  iso' :: (Additive dt) => 
+--    O.Iso' (LensD dt t da a) (LensType dt t da a)
+
+--tupleIso :: (Additive da0, Additive da1, Additive dt) => 
+--  O.Iso' (LensD dt t (da0, da1) (a0, a1)) (LensD dt t da0 a0, LensD dt t da1 a1)
+
+
 
 -- idArg :: DFunc t (w x) -> w (DFunc t x)
 

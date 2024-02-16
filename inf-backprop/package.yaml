@@ -1,5 +1,5 @@
 name:                inf-backprop
-version:             0.1.0.2
+version:             0.2.0.0
 license:             BSD3
 author:              "Alexey Tochin"
 maintainer:          "Alexey.Tochin@gmail.com"
@@ -47,8 +47,11 @@ dependencies:
   - ghc-prim
   - data-fix
   - safe
+  - extra
+  - unordered-containers
 
 ghc-options:
+#  - -w
   - -Wall
   - -Wcompat
   - -Widentities
@@ -61,7 +64,7 @@ ghc-options:
 
 library:
   source-dirs:
-    - src
+#    - src
     - src2
   default-extensions:
     - NoImplicitPrelude
@@ -84,6 +87,8 @@ tests:
     source-dirs:        doctests
     main:               Main.hs
     ghc-options:
+      - -w
+      - -fno-warn-missing-methods
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N

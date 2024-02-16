@@ -4,7 +4,7 @@ module Debug.DiffExpr where
 
 import Control.Arrow (Kleisli (Kleisli))
 import Control.CatBifunctor (first, second, (***))
-import Control.Category ((.), (>>>))
+import Control.Category ((.))
 import Control.Monad.Logger (MonadLogger, logInfoN)
 import Data.Text (pack)
 import Debug.SimpleExpr.Expr (SimpleExpr, unaryFunc, binaryFunc, number, variable, simplify, content, 
@@ -15,16 +15,16 @@ import Debug.SimpleExpr.Expr (SimpleExpr, unaryFunc, binaryFunc, number, variabl
 --  (.*.), merge
 --  )
 import IsomorphismClass.Isomorphism (iso)
-import NumHask (Additive, Distributive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, fromInteger, zero, (*), MultiplicativeAction, (.*))
+import NumHask (Additive, Distributive, Divisive, ExpField, Multiplicative, Subtractive, TrigField, fromInteger, zero, 
+  (*), MultiplicativeAction, (^^), Integral)
 import qualified NumHask as NH
 import qualified NumHask.Prelude as NHP
 --import qualified Prelude.InfBackprop
-import Prelude (Monad, Show, String, pure, return, show, ($), (<>), fmap, uncurry, curry, undefined)
+import Prelude (Monad, Show, String, pure, return, show, ($), (<>), fmap, uncurry, curry, undefined, Ord)
 import qualified Prelude as P
 import Debug.SimpleExpr (Expr)
-import InfBackprop.LensD (DFunc, LensD(LensD), tupleToLens)
+import InfBackprop.LensD (DFunc, LensD(LensD), tupleToLens, lensCtoP, IntegralPower, integralPow)
 import InfBackprop.Tangent (T)
-import InfBackprop.Common6 (lensCtoP)
 import Debug.Trace (trace)
 import Data.Fix (Fix (Fix, unFix))
 --import Debug.Hood.Observe (observe)
@@ -92,8 +92,6 @@ instance (Additive dt, BinnarySymbolicFunc a, Distributive a, T a ~ a) =>
     binarySymbolycFunc funcName = curry $ binarySymbolycLens funcName . tupleToLens
 
 --    binarySymbolycFunc funcName = lensCtoP (binarySymbolycFuncC funcName)
-
-
 
 
 

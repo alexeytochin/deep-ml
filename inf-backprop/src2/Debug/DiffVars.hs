@@ -2,12 +2,13 @@ module Debug.DiffVars where
 
 import Debug.DiffExpr (SymbolicFunc, unarrySymbolycFunc, BinnarySymbolicFunc, binarySymbolycFunc) 
 import Debug.SimpleExpr (variable, simplify, SimpleExpr, number)
-import InfBackprop.Common6 (derivative, gradientTuple, tupleArg)
+import InfBackprop.Common6 (derivative, gradientTuple, tupleArg, customDerivative, derivativeX, derivativeY, streamToLens)
 import Data.Function (($))
-import NumHask ((*), Additive, Distributive)
-import InfBackprop.LensD (stopDiff)
-import Prelude ((.), show, (<>), id)
-import Data.Stream (Stream, fromList)
+import NumHask ((*), (+), Additive, Distributive)
+import InfBackprop.LensD (stopDiff, LensD)
+import Prelude ((.), show, (<>), id, Float, undefined, Integer)
+import Data.Stream (Stream, fromList, iterate, take)
+import Data.FiniteList (FiniteList)
 --import Control.DeepSeq (force, NFData(..))
 
 
@@ -43,12 +44,13 @@ temp = (derivative . tupleArg) f2 (x, y) :: (SimpleExpr, SimpleExpr)
 -- >>> import NumHask (Additive, Distributive)
 -- >>> import InfBackprop.Common6 (derivative, tupleArg)
 -- >>> import GHC.Prim (seq)
+-- >>> import Prelude.Tools (cross)
+-- >>> import Prelude (fmap)
 --
 -- -- >>> s0 = show (derivative f x :: SimpleExpr)
 -- -- >>> s = show ((derivative . tupleArg) f2 (x, y) :: (SimpleExpr, SimpleExpr))
 -- -- >>> s
 -- -- XXX
---
 --
 -- >>> x = variable "x"
 -- >>> f = unarrySymbolycFunc "f"
@@ -60,10 +62,10 @@ temp = (derivative . tupleArg) f2 (x, y) :: (SimpleExpr, SimpleExpr)
 -- 
 -- >>> g = unarrySymbolycFunc "g"
 -- >>> simplify $ derivative (f * g) x :: SimpleExpr
--- (f'(x)·g(x))+(g'(x)·f(x))
+-- (f'(x)*g(x))+(g'(x)*f(x))
 -- 
 -- >>> simplify $ derivative (\a -> stopDiff (number 2) * f a) x :: SimpleExpr
--- f'(x)·2
+-- f'(x)*2
 -- 
 -- >>> simplify $ (derivative $ derivative f) x :: SimpleExpr
 -- f''(x)
@@ -72,21 +74,45 @@ temp = (derivative . tupleArg) f2 (x, y) :: (SimpleExpr, SimpleExpr)
 -- f(g(x))
 --
 -- >>> simplify $ derivative (f . g) x :: SimpleExpr
--- g'(x)·f'(g(x))
+-- g'(x)*f'(g(x))
 --
 -- >>> simplify $ derivative (f . g . h) x :: SimpleExpr
--- h'(x)·(g'(h(x))·f'(g(h(x))))
+-- h'(x)*(g'(h(x))*f'(g(h(x))))
 --
 -- >>> simplify $ (derivative $ derivative (f . g)) x :: SimpleExpr
--- (g''(x)·f'(g(x)))+(g'(x)·(f''(g(x))·g'(x)))
+-- (g''(x)*f'(g(x)))+(g'(x)*(f''(g(x))*g'(x)))
 --
--- >>> simplify $ gradientTuple (*) x y :: (SimpleExpr, SimpleExpr)
--- (y·1,x·1)
+-- >>> (cross simplify simplify) $ gradientTuple (*) x y :: (SimpleExpr, SimpleExpr)
+-- (y,x)
+--
+-- >>> simplify $ derivativeX (*) x y
+-- y
+--
+-- >>> derivative (\x -> x * derivativeY (*) x (stopDiff (2 :: Float))) (1 :: Float)
+-- 2.0
+--
+-- >>> derivative (\x -> x * derivativeY (*) x (stopDiff (2 :: Float))) (1 :: Float)
+-- 2.0
 -- 
--- >>> simplify2 $ derivative1 (lensCtoP multC) (x, y)
--- [y,x]
+-- >>> take 5 $ (iterate (+ 1) (1 :: Integer))
+-- [1,2,3,4,5]
+-- 
+-- >>> stream = customDerivative streamToLens id streamFunc (x :: SimpleExpr) :: Stream SimpleExpr
+-- >>> stream2 = fmap simplify stream
+-- >>> take 5 stream2
+-- [f_0'(x),f_1'(x),f_2'(x),f_3'(x),f_4'(x)]
+--
 
-streamF :: SimpleExpr -> Stream SimpleExpr
-streamF x = fromList [unarrySymbolycFunc ("f_" <> show n) x | n <- [0..]]
 
---_ = customDerivative _ id streamF x :: Stream SimpleExpr
+_ = customDerivative streamToLens id streamFunc (x :: SimpleExpr) :: Stream SimpleExpr
+
+--streamF :: SimpleExpr -> Stream SimpleExpr
+--streamF x = fromList [unarrySymbolycFunc ("f_" <> show n) x | n <- [0..]]
+
+streamFunc :: SymbolicFunc a => a -> Stream a
+streamFunc x = fromList [unarrySymbolycFunc ("f_" <> show n) x | n <- [0..]]
+
+
+--streamToLens :: Stream (LensD dt t dx x) -> LensD dt t (Stream dx) (Stream x)
+--streamToLens = undefined
+

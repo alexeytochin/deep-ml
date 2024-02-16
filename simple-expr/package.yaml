@@ -1,9 +1,9 @@
 name:                simple-expr
-version:             0.1.1.0
+version:             0.2.0.0
 license:             BSD3
 author:              "Alexey Tochin"
 maintainer:          "Alexey.Tochin@gmail.com"
-copyright:           "2023 Alexey Tochin"
+copyright:           "2024 Alexey Tochin"
 
 extra-source-files:
   - CHANGELOG.md

@@ -33,7 +33,7 @@ simpleExprToGraph :: SimpleExpr -> DGraph String ()
 simpleExprToGraph (Fix e) = case e of
   NumberF n -> appendNodeToGraph (show n) [] graph
   VariableF c -> appendNodeToGraph c [] graph
-  BinaryFuncF _ a b -> appendNodeToGraph (show (Fix e)) [show a, show b] graph
+--  BinaryFuncF _ a b -> appendNodeToGraph (show (Fix e)) [show a, show b] graph
   SymbolicFuncF _ args' -> appendNodeToGraph (show (Fix e)) (fmap show args') graph
   where
     graph = exprToGraph $ dependencies (Fix e)
