@@ -70,7 +70,7 @@ import Prelude (FilePath, IO, String)
 -- We can try to simplify an expressions with the aid of quite a primitive 'simplify' method
 --
 -- >>> x = variable "x"
--- >>> simplify $ (x + 0) * 1 - x * (3 - 2)
+-- >>> simplify $ (x + 0) * 1 - x * (3 - 2) :: SimpleExpr
 -- 0
 
 -- $visualisation
@@ -111,12 +111,11 @@ import Prelude (FilePath, IO, String)
 --
 -- 'exprToGraph'@ :: @'Expr'@ d => d -> @'DGraph' 'String'@ () @
 --
--- transforms an expression to a graph
--- and
+-- transforms an expression to a graph and
 --
 -- 'plotDGraphPng'@ :: @'DGraph'@ v e -> @'FilePath'@ -> @'IO' 'FilePath'.
 --
--- plats the graph.
+-- plots the graph.
 --
 -- Consider now a more representative example
 --

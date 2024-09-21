@@ -28,6 +28,8 @@ import InfBackprop.Tangent (T)
 import Debug.Trace (trace)
 import Data.Fix (Fix (Fix, unFix))
 --import Debug.Hood.Observe (observe)
+import InfBackprop.Tangent (Tangent, T)
+
 
 
 twoArgFunc :: String -> SimpleExpr -> SimpleExpr -> SimpleExpr
@@ -84,7 +86,7 @@ binarySymbolycLens funcName (LensD a) = LensD $ \t -> let
     ((x1, x2), dyx) = a t
   in (
       binarySymbolycFunc funcName x1 x2,
-      \dy -> dyx (binarySymbolycFunc (funcName <> "_1") x1 x2 * dy, binarySymbolycFunc (funcName <> "_2") x1 x2 * dy)
+      \dy -> dyx (binarySymbolycFunc (funcName <> "'_1") x1 x2 * dy, binarySymbolycFunc (funcName <> "'_2") x1 x2 * dy)
     )
 
 instance (Additive dt, BinnarySymbolicFunc a, Distributive a, T a ~ a) =>

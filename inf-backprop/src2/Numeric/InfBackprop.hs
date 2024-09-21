@@ -10,9 +10,15 @@
 module Numeric.InfBackprop
   (
     derivative,
-    intPow
+    customDerivative,
+    tupleLensIso,
+    smallVecLensIso,
+    idIso,
+    intPow,
+    LensD(LensD),
   )
 where
   
-import InfBackprop.Common6 (derivative)
-import InfBackprop.LensD (intPow)
+import InfBackprop.Common6 (derivative, customDerivative)
+import InfBackprop.LensD (intPow, tupleLensIso, idIso, LensD(LensD))
+import InfBackprop.Vector (smallVecLensIso)

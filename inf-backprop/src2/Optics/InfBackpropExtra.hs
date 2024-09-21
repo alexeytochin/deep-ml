@@ -10,5 +10,6 @@ import Prelude (Functor, fmap)
 crossed :: Iso' s1 a1 -> Iso' s2 a2 -> Iso' (s1, s2) (a1, a2)
 crossed iso1 iso2 = iso (cross (view iso1) (view iso2)) (cross (review iso1) (review iso2))
 
-fmaped :: Functor f => Iso' s a -> Iso' (f s) (f a)
+fmaped :: Functor f => 
+  Iso' s a -> Iso' (f s) (f a)
 fmaped i = iso (fmap (view i)) (fmap (review i))

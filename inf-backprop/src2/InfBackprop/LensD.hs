@@ -25,6 +25,8 @@ import GHC.Int (Int8, Int16, Int32, Int64)
 import GHC.Word (Word8, Word16, Word32, Word64)
 import Debug.SimpleExpr (SimpleExpr, number)
 
+
+
 --data D dx x dy y  = D {
 --  view    :: x -> y,
 --  update  :: x -> dy -> dx
@@ -40,6 +42,10 @@ view (LensD x) = fst . x
 
 update :: LensD dx x dy y -> x -> dy -> dx
 update (LensD x) = snd . x
+
+pullback :: LensD cx x cy y -> (y -> cy) -> x -> cx
+pullback (LensD l) my x = bp (my y) where
+  (y, bp) = l x
 
 identity :: LensD dx x dx x
 identity = LensD (, id)
@@ -128,8 +134,8 @@ class Lensable1 f df | f -> df where
 --binnaryFuncToLens :: LensD dt t dx1 x1 -> LensD dt t dx2 x2 -> LensD dt t (dx1, dx2) (x1, x2)
 
 
-dId :: Iso' (LensD dt t da a) (LensD dt t da a)
-dId = iso id id
+idIso :: Iso' (LensD dt t da a) (LensD dt t da a)
+idIso = iso id id
 
 -- | Optimized wrt lensCtoP
 lensToUnnaryFunc :: LensD dx x dy y -> LensD dt t dx x -> LensD dt t dy y
@@ -168,9 +174,9 @@ lensToTuple (LensD a) = (LensD a0, LensD a1) where
       ((_, x1), dxt) = a t
     in (x1, \dx1 -> dxt (zero, dx1))
 
-tupleLensIso' :: (Additive da0, Additive da1, Additive dt) =>
-  Iso' (LensD dt t (da0, da1) (a0, a1)) (LensD dt t da0 a0, LensD dt t da1 a1)
-tupleLensIso' = iso lensToTuple tupleToLens
+tupleLensIso :: (Additive da0, Additive da1, Additive dt) =>
+  Iso' (LensD dt t (da0, da1) (a0_, a1_)) (LensD dt t da0 a0_, LensD dt t da1 a1_)
+tupleLensIso = iso lensToTuple tupleToLens
 
 instance (Additive dx0, Additive dx1) => 
   Lensable (dx0, dx1) (x0, x1) where
@@ -211,6 +217,17 @@ tripleLensIso' = iso lensToTriple tripleToLens
 lensToTernaryFunc :: forall dx0 dx1 dx2 x0 x1 x2 dy y dt t. Additive dt =>
   LensD (dx0, dx1, dx2) (x0, x1, x2) dy y -> LensD dt t dx0 x0 -> LensD dt t dx1 x1 -> LensD dt t dx2 x2 -> LensD dt t dy y
 lensToTernaryFunc lens = curry3 $ (lensToUnnaryFunc lens :: LensD dt t (dx0, dx1, dx2) (x0, x1, x2) -> LensD dt t dy y) . tripleToLens
+
+
+
+--mapToLens :: forall r dt t dx x. Additive dt =>
+--  (r -> LensD dt t dx x) -> LensD dt t (r -> dx) (r -> x)
+--mapToLens lensMap = LensD $ \t -> let
+--    xr = \r -> fst $ unpackLensD (lensMap r) t
+--    dxtr = \r -> snd $ unpackLensD (lensMap r) t :: (r -> dx) -> dt
+--  in (xr :: r -> x, dxtr :: (r -> dx) -> dt)
+
+
 
 
 -- Const
@@ -493,8 +510,7 @@ instance (Additive dt) =>
 
 instance (Basis a, Additive dt) =>
   Basis (LensD dt t da a) where
-    type End (LensD dt t da a) b = End a b -- (LensD dt t (T b) b)
-    --    basis   :: forall b. (a -> b) -> End a b
+    type End (LensD dt t da a) b = End a b
     initBackProp :: forall b. (LensD dt t da a -> b) -> End a b
     initBackProp bp = initBackProp (bp . constC_)
     zeroBackProp :: LensD dt t da a

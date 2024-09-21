@@ -40,7 +40,7 @@ import IsomorphismClass.Isomorphism (Isomorphism, iso)
 import NumHask (one, zero)
 import NumHask.Algebra.Additive (Additive)
 import NumHask.Algebra.Ring (Distributive)
-import NumHask.Extra ()
+import NumHask.Extra10 ()
 import Prelude (Monad, flip, fromIntegral, iterate, pure, (!!), ($))
 import qualified Prelude as P
 

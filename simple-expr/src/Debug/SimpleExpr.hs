@@ -13,10 +13,13 @@ module Debug.SimpleExpr
     variable,
     unaryFunc,
     binaryFunc,
+    simplifyExpr,
     simplify,
 
     -- * Base types
     SimpleExpr,
+    SE,
+    SimpleExprF,
     Expr,
 
     -- * Visualisation
@@ -35,12 +38,15 @@ import Data.Graph.VisualizeAlternative (plotDGraph)
 import Debug.SimpleExpr.Expr
   ( Expr,
     SimpleExpr,
+    SE,
     binaryFunc,
     content,
     dependencies,
     number,
+    simplifyExpr,
     simplify,
     unaryFunc,
-    variable,
+    variable, 
+    SimpleExprF,
   )
 import Debug.SimpleExpr.GraphUtils (exprToGraph, plotDGraphPng, plotExpr)

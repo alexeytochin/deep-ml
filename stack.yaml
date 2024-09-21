@@ -3,3 +3,17 @@ resolver: lts-22.8 # ghc 9.6.4 # lts-21.6 # ghc 9.4.5
 packages:
   - inf-backprop
   - simple-expr
+
+#extra-deps:
+#  - conduit-1.2.13.1@sha256:ebc999794e997fedbaf256a9c56cb08e42be83d9ce42101a1fd1b9b872a03d5b,4513
+#  - conduit-extra-1.1.17@sha256:dfa0d00dc11a8a4c3fdff15374c378ee34c25a2255b52194aa1ea3c1f1a63fd7,4521
+#  - reanimate-svg-0.13.0.1
+#  - github: reanimate/reanimate
+#    commit: 82638c078c2f62838d8b6cf77a6a138cf37d2f77
+#  - reanimate-1.1.5.0
+#  - aeson-1.5.6.0
+
+#  source-repository-package
+#type: git
+#location: https://github.com/reanimate/reanimate.git
+#tag: 7d949ea0eac379007da11b48f77012661115e9a1

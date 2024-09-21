@@ -26,6 +26,10 @@ description: |
   for a functional type-dependent library for deep machine learning.
   See [tutorial](docs/InfBackprop-Tutorial.html) details.
   
+  Similar projects:
+  1. [ad](https://https://hackage.haskell.org/package/ad)
+  2. [backprop](https://hackage.haskell.org/package/backprop)
+  
 dependencies:
   - base >= 4.7 && < 5
   - numhask
@@ -34,7 +38,7 @@ dependencies:
   - text
   - transformers
   - comonad
-  - simple-expr
+  - simple-expr >= 0.2.0.0
   - profunctors
   - optics
   - finite-typelits
@@ -49,6 +53,10 @@ dependencies:
   - safe
   - extra
   - unordered-containers
+  - composition-prelude
+#  - Reanimate
+#  - tuple-sop
+
 
 ghc-options:
 #  - -w
@@ -64,8 +72,7 @@ ghc-options:
 
 library:
   source-dirs:
-#    - src
-    - src2
+    - src5
   default-extensions:
     - NoImplicitPrelude
     - GADTs
@@ -93,5 +100,29 @@ tests:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - simple-expr
+      - simple-expr >= 0.2.0.0
       - doctest
+
+executables:
+  mkimage:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - simple-expr
+      - inf-backprop
+
+#executables:
+#  animation-exe:
+#    main:                Animation.hs
+#    source-dirs:         animation
+#    ghc-options:
+#      - -threaded
+#      - -rtsopts
+#      - -with-rtsopts=-N
+#    dependencies:
+##      - animation
+#      - reanimate

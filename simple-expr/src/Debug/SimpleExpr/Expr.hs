@@ -10,19 +10,21 @@
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
 --
 -- Simple expressions base types and manipulations.
-module Debug.SimpleExpr.Expr
+module  Debug.SimpleExpr.Expr
   ( -- * Expression manipulation
     number,
     variable,
     unaryFunc,
     binaryFunc,
-    simplify,
+    simplifyExpr,
     simplifyStep,
+    simplify,
 
     -- * Base types
 --    SimpleExprF (NumberF, VariableF, BinaryFuncF, SymbolicFuncF),
     SimpleExprF (NumberF, VariableF, SymbolicFuncF),
     SimpleExpr,
+    SE,
     Expr,
 
     -- * Auxiliary functions
@@ -64,6 +66,8 @@ import Prelude
     head,
     length,
     tail,
+    const,
+    id,
   )
 --import BasicPrelude (Show)
 import Data.Maybe (isJust)
@@ -71,6 +75,7 @@ import qualified Prelude as P
 import GHC.Natural (Natural)
 --import Data.Text (Text, length, head, last, tail, init, unpack)
 import Control.Monad (guard)
+import Control.ExtendableMap (ExtandableMap, extendMap)
 
 -- | Expression F-algebra functional.
 data SimpleExprF a
@@ -96,6 +101,7 @@ instance NH.FromIntegral Natural n =>
 -- | Simple expression type, see
 -- [tutorial](Debug.SimpleExpr.Tutorial.hs)
 type SimpleExpr = Fix SimpleExprF
+type SE = SimpleExpr
 
 -- | Initializes a single integer number expression.
 --
@@ -163,24 +169,33 @@ instance NH.FromIntegral Natural n =>
 class ListOf inner outer where
   -- | Returns a list of entities the argument consists of.
   content :: outer -> [inner]
+--  map :: (inner -> inner) -> outer -> outer
 
 instance ListOf inner () where
   content = P.const []
+--  map _ = const ()
 
 instance ListOf inner inner where
   content e = [e]
+--  map = id
 
-instance (ListOf inner outer1, ListOf inner outer2) => ListOf inner (outer1, outer2) where
-  content (x1, x2) = content x1 ++ content x2
+instance (ListOf inner outer1, ListOf inner outer2) => 
+  ListOf inner (outer1, outer2) 
+  where
+    content (x1, x2) = content x1 ++ content x2
+--    map f (x0, x1) = (f x0, f x1)  
 
-instance (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3) => ListOf inner (outer1, outer2, outer3) where
-  content (x1, x2, x3) = content x1 ++ content x2 ++ content x3
+instance (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3) => 
+  ListOf inner (outer1, outer2, outer3) 
+  where
+    content (x1, x2, x3) = content x1 ++ content x2 ++ content x3
+--    map f (x0, x1, x2) = (f x0, f x1, f x2)  
 
 instance
   (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3, ListOf inner outer4) =>
-  ListOf inner (outer1, outer2, outer3, outer4)
-  where
-  content (x1, x2, x3, x4) = content x1 ++ content x2 ++ content x3 ++ content x4
+    ListOf inner (outer1, outer2, outer3, outer4)
+    where
+    content (x1, x2, x3, x4) = content x1 ++ content x2 ++ content x3 ++ content x4
 
 instance
   (ListOf inner outer1, ListOf inner outer2, ListOf inner outer3, ListOf inner outer4, ListOf inner outer5) =>
@@ -351,6 +366,13 @@ simplifyStep :: (SimpleExpr -> SimpleExpr) -> SimpleExpr -> SimpleExpr
 simplifyStep f e = case e of
   n@(Fix (NumberF _)) -> n
   c@(Fix (VariableF _)) -> c
+  Fix (SymbolicFuncF name [arg]) -> case name of
+    "-" -> case unFix (f arg) of
+      NumberF 0 -> Fix $ NumberF 0
+      SymbolicFuncF "-" [arg'] -> f arg'
+      SymbolicFuncF "(-)" [leftArg, rightArg] -> Fix $ SymbolicFuncF "(-)" [f rightArg, f leftArg]
+      _ -> Fix $ SymbolicFuncF "-" [f arg]
+    _ ->  Fix $ SymbolicFuncF name [f arg]
   Fix (SymbolicFuncF name [leftArg, rightArg]) -> case name of
     "(+)" -> case (unFix leftArg, unFix rightArg) of
       (NumberF 0, _) -> f rightArg
@@ -374,6 +396,12 @@ simplifyStep f e = case e of
       (NumberF 1, _) -> f rightArg
       (_, NumberF 1) -> f leftArg
       (NumberF n, NumberF m) -> Fix (NumberF (n P.* m))
+      (SymbolicFuncF "-" [leftArg'], SymbolicFuncF "-" [rightArg']) 
+        -> Fix $ SymbolicFuncF "(*)" [f leftArg', f rightArg']
+      (SymbolicFuncF "-" [leftArg'], rightArg') 
+        -> Fix $ SymbolicFuncF "-" [Fix $ SymbolicFuncF "(*)" [leftArg', Fix rightArg']]
+      (leftArg', SymbolicFuncF "-" [rightArg']) 
+        -> Fix $ SymbolicFuncF "-" [Fix $ SymbolicFuncF "(*)" [Fix leftArg', rightArg']]
       _ -> Fix (SymbolicFuncF "(*)" [f leftArg, f rightArg])
     "(^)" -> case (unFix leftArg, unFix rightArg) of
       (NumberF n, NumberF m) -> Fix (NumberF (n P.^ m))
@@ -394,7 +422,10 @@ simplifyStep f e = case e of
 -- >>> import NumHask ((+), (-), (*))
 --
 -- >>> x = variable "x"
--- >>> simplify $ (x + 0) * 1 - x * (3 - 2)
+-- >>> simplifyExpr $ (x + 0) * 1 - x * (3 - 2)
 -- 0
-simplify :: SimpleExpr -> SimpleExpr
-simplify = fix $ iterateUntilEqual . simplifyStep -- simplify = iterateUntilEqual (simplifyStep simplify)
+simplifyExpr :: SimpleExpr -> SimpleExpr
+simplifyExpr = fix $ iterateUntilEqual . simplifyStep -- simplify = iterateUntilEqual (simplifyStep simplify)
+
+simplify :: ExtandableMap SimpleExpr SimpleExpr a b => a -> b
+simplify = extendMap simplifyExpr

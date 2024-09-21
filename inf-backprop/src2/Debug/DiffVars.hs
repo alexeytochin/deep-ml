@@ -2,15 +2,19 @@ module Debug.DiffVars where
 
 import Debug.DiffExpr (SymbolicFunc, unarrySymbolycFunc, BinnarySymbolicFunc, binarySymbolycFunc) 
 import Debug.SimpleExpr (variable, simplify, SimpleExpr, number)
-import InfBackprop.Common6 (derivative, gradientTuple, tupleArg, customDerivative, derivativeX, derivativeY, streamToLens)
+import InfBackprop.Common6 (derivative, gradientTuple_, tupleArg, customDerivative, derivativeX, derivativeY,
+  customDerivative2
+  )
 import Data.Function (($))
-import NumHask ((*), (+), Additive, Distributive)
-import InfBackprop.LensD (stopDiff, LensD)
+import NumHask ((*), (+), Additive, Distributive, sin, cos, TrigField)
+import InfBackprop.LensD (stopDiff, LensD, tupleLensIso, idIso)
 import Prelude ((.), show, (<>), id, Float, undefined, Integer)
 import Data.Stream (Stream, fromList, iterate, take)
-import Data.FiniteList (FiniteList)
+import Data.FiniteList (BoundedStream)
+import InfBackprop.Stream (streamToLens)
+import Temp (smartMap)
 --import Control.DeepSeq (force, NFData(..))
-
+import Data.Basis3 (End)
 
 --instance NFData SimpleExpr
 
@@ -82,7 +86,7 @@ temp = (derivative . tupleArg) f2 (x, y) :: (SimpleExpr, SimpleExpr)
 -- >>> simplify $ (derivative $ derivative (f . g)) x :: SimpleExpr
 -- (g''(x)*f'(g(x)))+(g'(x)*(f''(g(x))*g'(x)))
 --
--- >>> (cross simplify simplify) $ gradientTuple (*) x y :: (SimpleExpr, SimpleExpr)
+-- >>> (cross simplify simplify) $ gradientTuple_ (*) x y :: (SimpleExpr, SimpleExpr)
 -- (y,x)
 --
 -- >>> simplify $ derivativeX (*) x y
@@ -97,14 +101,23 @@ temp = (derivative . tupleArg) f2 (x, y) :: (SimpleExpr, SimpleExpr)
 -- >>> take 5 $ (iterate (+ 1) (1 :: Integer))
 -- [1,2,3,4,5]
 -- 
--- >>> stream = customDerivative streamToLens id streamFunc (x :: SimpleExpr) :: Stream SimpleExpr
+-- >>> stream = customDerivative2 streamToLens id streamFunc (x :: SimpleExpr) :: Stream SimpleExpr
 -- >>> stream2 = fmap simplify stream
 -- >>> take 5 stream2
 -- [f_0'(x),f_1'(x),f_2'(x),f_3'(x),f_4'(x)]
 --
 
+f5 = \x -> (sin x, cos x)
+_ = customDerivative tupleLensIso idIso f5 x
 
-_ = customDerivative streamToLens id streamFunc (x :: SimpleExpr) :: Stream SimpleExpr
+f6 :: TrigField a => a -> (a, a)
+f6 x' = (sin x', cos x')
+
+f6' = customDerivative tupleLensIso idIso f6 :: SimpleExpr -> (SimpleExpr, SimpleExpr) -- Float -> (Float, Float)
+_ = f6' (variable "x")
+
+
+_ = customDerivative2 streamToLens id streamFunc (x :: SimpleExpr) :: Stream SimpleExpr
 
 --streamF :: SimpleExpr -> Stream SimpleExpr
 --streamF x = fromList [unarrySymbolycFunc ("f_" <> show n) x | n <- [0..]]
@@ -115,4 +128,12 @@ streamFunc x = fromList [unarrySymbolycFunc ("f_" <> show n) x | n <- [0..]]
 
 --streamToLens :: Stream (LensD dt t dx x) -> LensD dt t (Stream dx) (Stream x)
 --streamToLens = undefined
+
+--smartSimplify = smartMap simplify
+
+--tupleArgDerivative :: ((LensD (SimpleExpr, SimpleExpr) (SimpleExpr, SimpleExpr) SimpleExpr SimpleExpr, LensD (SimpleExpr, SimpleExpr) (SimpleExpr, SimpleExpr) SimpleExpr SimpleExpr) -> LensD (SimpleExpr, SimpleExpr) (SimpleExpr, SimpleExpr) SimpleExpr SimpleExpr) -> (SimpleExpr, SimpleExpr) -> End SimpleExpr (SimpleExpr, SimpleExpr)
+--tupleArgDerivative = customDerivative idIso tupleLensIso
+--f' :: (SimpleExpr, SimpleExpr) -> (SimpleExpr, SimpleExpr)
+--f' = smartSimplify . tupleArgDerivative f
+
 

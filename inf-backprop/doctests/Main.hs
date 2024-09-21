@@ -19,5 +19,7 @@ main =
       "-XFlexibleContexts",
       "-XDeriveFunctor",
       "-XBangPatterns",
-      "src2"
+      "-XDataKinds",
+      "-XTypeApplications",
+      "src5"
     ]

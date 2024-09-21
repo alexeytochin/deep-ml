@@ -41,6 +41,9 @@ dependencies:
   - hashable
   - unicode-show
   - data-fix
+  - Stream
+  - vector
+  - vector-sized
 
 ghc-options:
   - -Wall
@@ -77,4 +80,3 @@ tests:
     dependencies:
       - simple-expr
       - doctest
-

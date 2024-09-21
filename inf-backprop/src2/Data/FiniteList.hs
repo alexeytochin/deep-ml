@@ -2,23 +2,28 @@
 -- {-# LANGUAGE BangPatterns #-}
 
 module Data.FiniteList (
-    FiniteList,
+    BoundedStream,
     getList,
     length,
     unit,
-    join,
+    bJoin,
+    bHead,
+    bTail,
     emptyFiniteList,
-    consFiniteList,
+    replicate,
+    basis,
+    -- consFiniteList,
+    convWithStream,
     zipWithStream,
     zipWithStream2
   ) where
 
-import Prelude (Functor, Monad, Applicative, Show, Monoid, Semigroup, (+), (-), fmap, (<>), mempty, fromIntegral,
-  Foldable, (.), ($), flip)
+import Prelude (Functor, Monad, Applicative, Show, Monoid, Semigroup, fmap, (<>), mempty, fromIntegral,
+  Foldable, (.), ($), flip, Maybe(Just, Nothing), max)
 import qualified Prelude as P
 import Data.Vector.Fixed (VecList)
 import GHC.Natural (Natural)
-import NumHask (Distributive, one, zero, (*), Multiplicative, sum)
+import NumHask (Distributive, one, zero, (*), Multiplicative, sum, Additive, (+), (-))
 import Data.Stream (Stream, toList)
 
 
@@ -29,50 +34,73 @@ import Data.Stream (Stream, toList)
 --  
 --FiniteListToList =  . getVecList
 
-data FiniteList a = UnsafeMkFiniteList {length :: !Natural, getList :: [a]} deriving 
+data BoundedStream a = UnsafeMkFiniteList {length :: !Natural, getList :: [a]} deriving
   (Show)
 
-emptyFiniteList :: FiniteList a
+bHead :: Additive a => BoundedStream a -> a
+bHead (UnsafeMkFiniteList _ []) = zero
+bHead (UnsafeMkFiniteList _ (x : _)) = x
+
+bTail :: BoundedStream a -> BoundedStream a
+bTail (UnsafeMkFiniteList _ []) = emptyFiniteList
+bTail (UnsafeMkFiniteList n (_: ls)) = UnsafeMkFiniteList (n - 1) ls
+
+
+
+emptyFiniteList :: BoundedStream a
 emptyFiniteList = UnsafeMkFiniteList 0 []
 
-join :: a -> FiniteList a -> FiniteList a
-join x (UnsafeMkFiniteList n ls) = UnsafeMkFiniteList (n + 1) (x : ls)
+bJoin :: a -> BoundedStream a -> BoundedStream a
+bJoin x (UnsafeMkFiniteList n ls) = UnsafeMkFiniteList (n + 1) (x : ls)
 
-consFiniteList :: a -> FiniteList a -> FiniteList a
-consFiniteList x (UnsafeMkFiniteList l lx) = UnsafeMkFiniteList (l + 1) (x : lx) 
+--bConcat :: BoundedStream a -> BoundedStream a -> BoundedStream a
+--bConcat (UnsafeMkFiniteList length1 list1) (UnsafeMkFiniteList length2 list2) = 
 
-unit :: a -> FiniteList a
+
+--consFiniteList :: a -> BoundedStream a -> BoundedStream a
+--consFiniteList x (UnsafeMkFiniteList l lx) = UnsafeMkFiniteList (l + 1) (x : lx)
+
+unit :: a -> BoundedStream a
 unit x = UnsafeMkFiniteList 1 [x]
 
-replicate :: Natural -> a -> FiniteList a
+replicate :: Natural -> a -> BoundedStream a
 replicate n x = UnsafeMkFiniteList n (P.replicate (fromIntegral n) x) 
 
-basis :: Distributive a => Natural -> FiniteList a
+basis :: Distributive a => Natural -> BoundedStream a
 basis n = case n of 
   0 -> emptyFiniteList
   1 -> unit one
-  _ -> consFiniteList zero (basis (n - 1))
+  _ -> bJoin zero (basis (n - 1))
   
-instance Functor FiniteList where
+instance Functor BoundedStream where
   fmap f (UnsafeMkFiniteList l lx) = UnsafeMkFiniteList l (fmap f lx) 
 
-instance Semigroup (FiniteList a) where
+instance Semigroup (BoundedStream a) where
   (UnsafeMkFiniteList l1 lx1) <> (UnsafeMkFiniteList l2 lx2) = UnsafeMkFiniteList (l1 + l2) (lx1 <> lx2) 
   
-instance Monoid (FiniteList a) where
+instance Monoid (BoundedStream a) where
   mempty = emptyFiniteList
 
-instance Foldable FiniteList where
-  foldr :: (a -> b -> b) -> b -> FiniteList a -> b
+instance Foldable BoundedStream where
+  foldr :: (a -> b -> b) -> b -> BoundedStream a -> b
   foldr f b (UnsafeMkFiniteList _ l) = P.foldr f b l
 
-zipWithStream :: (a -> b -> c) -> Stream a -> FiniteList b -> FiniteList c
+instance (Additive a) => Additive (BoundedStream a) where
+  zero = emptyFiniteList
+  (UnsafeMkFiniteList nx lx) + (UnsafeMkFiniteList ny ly) = UnsafeMkFiniteList (max nx ny) (listSum lx ly) 
+
+listSum :: Additive a => [a] -> [a] -> [a]
+listSum [] y = y
+listSum x [] = x
+listSum (x : xs) (y : ys) = (x + y) : listSum xs ys
+  
+zipWithStream :: (a -> b -> c) -> Stream a -> BoundedStream b -> BoundedStream c
 zipWithStream f s (UnsafeMkFiniteList n l) = UnsafeMkFiniteList n (P.zipWith f (toList s) l)
 
-zipWithStream2 :: (a -> b -> c) -> FiniteList a -> Stream b -> FiniteList c
+zipWithStream2 :: (a -> b -> c) -> BoundedStream a -> Stream b -> BoundedStream c
 zipWithStream2 f = flip $ zipWithStream (flip f)
 
 
 convWithStream :: Distributive a =>
-  Stream a -> FiniteList a -> a
+  Stream a -> BoundedStream a -> a
 convWithStream a b = sum $ zipWithStream (*) a b

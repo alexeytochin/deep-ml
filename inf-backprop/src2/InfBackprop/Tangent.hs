@@ -3,7 +3,7 @@ module InfBackprop.Tangent where
 import Data.Kind (Type)
 import Prelude (Float)
 import Data.Stream (Stream)
-import Data.FiniteList (FiniteList)
+import Data.FiniteList (BoundedStream)
 
 
 type family Tangent (x :: Type) :: Type
@@ -11,8 +11,8 @@ type instance Tangent Float = Float
 type instance Tangent (a, b) = (Tangent a, Tangent b)
 type instance Tangent (a, b, c) = (Tangent a, Tangent b, Tangent c)
 type instance Tangent [a] = [Tangent a]
-type instance Tangent (Stream a) = FiniteList (Tangent a)
-type instance Tangent (FiniteList a) = Stream (Tangent a)
+type instance Tangent (Stream a) = BoundedStream (Tangent a)
+type instance Tangent (BoundedStream a) = Stream (Tangent a)
 
 
 

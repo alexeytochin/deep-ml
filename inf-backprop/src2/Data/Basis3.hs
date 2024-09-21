@@ -29,20 +29,25 @@ import qualified Data.Vector.Fixed.Boxed as VFB
 import qualified Data.Vector.Fixed as VF
 import Data.Primitive.SmallArray (SmallArray(..))
 import Data.Vector.Fixed.Cont (Arity)
-import Debug.SimpleExpr (SimpleExpr)  
-import Data.FiniteList (FiniteList, emptyFiniteList, unit, join)
+import Debug.SimpleExpr (SimpleExpr)
+import Data.FiniteList (BoundedStream, emptyFiniteList, unit, bJoin)
 
 
-class Basis (a :: Type) where -- | a -> ta
-  type End (a :: Type) (b :: Type) :: Type
-  initBackProp :: forall b. (a -> b) -> End a b
-  zeroBackProp  :: a -- Proxy a -> T a
+class Basis (b :: Type) where -- | a -> ta
+  type End (b :: Type) (a :: Type) :: Type
+--  startBackProp :: 
+  initBackProp :: forall a. (b -> a) -> End b a
+  zeroBackProp :: b -- Proxy a -> T a
 --  toLens ::
+
+--class Basis a Scalar a
 
 instance Basis Float where
   type End Float b = b
   initBackProp f = f 1
   zeroBackProp = 0
+
+type instance Tangent (a0, a1) = (Tangent a0, Tangent a1)
 
 instance forall a1 a2. (Basis a1, Basis a2) =>
   Basis (a1, a2) where
@@ -95,39 +100,9 @@ basisList one_ mkZero_ i l = [if i == j then one_ else mkZero_ a | (j, a) <- zip
 --  0 -> one' <:> repeat zero
 --  _ -> zero' <:> oneHotStream zero' one' (n - 1)
 
-streamBasis :: a -> a -> Stream (Stream a)
-streamBasis zero' one' = iterate (zero' <:>) (one' <:> repeat zero')
 
-enumerateList :: [a] -> [(Natural, a)]
-enumerateList = zip [(0 :: Natural) ..]
 
---listDual :: (Multiplicative a, Additive a) =>
---  ([()], [a] -> b) -> [b]
---listDual (l, f) = [unitDual (\x -> f (basisList x i l)) | i <- counter l]
 
--- type instance Tangent (Stream a) = undefined --  VFB.Vec n (T a)
-
-instance Basis a =>
-  Basis (Stream a) where
-    type End (Stream a) b = Stream (End a b)
-    -- initBackProp :: forall b. (a -> b) -> End a b
-    initBackProp :: forall b. (Stream a -> b) -> Stream (End a b)
-    initBackProp bp = map (\mkStream -> initBackProp (bp . mkStream)) mkStreams where
-      mkStreams = iterate (\s a -> zeroBackProp <:> s a) (\a -> a <:> repeat zeroBackProp) :: Stream (a -> Stream a)
-
-    zeroBackProp :: Stream a
-    zeroBackProp = repeat zeroBackProp
-
-instance Basis a =>
-  Basis (FiniteList a) where
-    type End (FiniteList a) b = Stream (End a b)
-
-    initBackProp :: forall b. (FiniteList a -> b) -> Stream (End a b)
-    initBackProp bp = map (\mkStream -> initBackProp (bp . mkStream)) mkFiniteLists where
-      mkFiniteLists = iterate (\s a -> join zeroBackProp (s a)) unit :: Stream (a -> FiniteList a)
-        
-    zeroBackProp :: FiniteList a
-    zeroBackProp = emptyFiniteList
 
 
 
@@ -151,13 +126,13 @@ myBasisVector k zero' one' = generate $ \l ->
     else zero' 
 
 
-instance (VG.Vector DV.Vector a, KnownNat n, Basis a) =>
-  Basis (Vec n a) where
-    type End (Vec n a) b = Vec n (End a b)
-    initBackProp :: forall b. (Vec n a -> b) -> Vec n (End a b)
-    initBackProp bp = generate (\k -> initBackProp (bp . myBasisVector k zeroBackProp))
-    zeroBackProp :: Vec n a
-    zeroBackProp = replicate zeroBackProp
+--instance (VG.Vector DV.Vector a, KnownNat n, Basis a) =>
+--  Basis (Vec n a) where
+--    type End (Vec n a) b = Vec n (End a b)
+--    initBackProp :: forall b. (Vec n a -> b) -> Vec n (End a b)
+--    initBackProp bp = generate (\k -> initBackProp (bp . myBasisVector k zeroBackProp))
+--    zeroBackProp :: Vec n a
+--    zeroBackProp = replicate zeroBackProp
 
 
 tempV3 :: a -> VFB.Vec3 a
@@ -173,21 +148,21 @@ tempV3 x = VF.convert (x, x, x)
 --    then one'
 --    else zero'
 
-instance (Additive a) => Additive (VFB.Vec 2 a) where
-  (+) = VF.zipWith (+)
-  zero = VF.replicate zero
+--instance (Additive a) => Additive (VFB.Vec 2 a) where
+--  (+) = VF.zipWith (+)
+--  zero = VF.replicate zero
 
-type instance Tangent (VFB.Vec n a) = VFB.Vec n (T a)
+--type instance Tangent (VFB.Vec n a) = VFB.Vec n (T a)
 
 --type family End (Vec 2 a) b = () --  VFB.Vec2 (End a b)
 --
-instance forall a. (Basis a) => 
-  Basis (VFB.Vec 2 a) where
-    type End (VFB.Vec 2 a) b = VFB.Vec 2 (End a b)
-    initBackProp :: forall b. (VFB.Vec 2 a -> b) -> VFB.Vec 2 (End a b)
-    initBackProp bp = VF.convert $ initBackProp (bp . VF.convert :: VFB.Vec 2 a -> b)                
-    zeroBackProp :: VFB.Vec 2 a
-    zeroBackProp = VF.convert (zeroBackProp, zeroBackProp)
+--instance forall a. (Basis a) => 
+--  Basis (VFB.Vec 2 a) where
+--    type End (VFB.Vec 2 a) b = VFB.Vec 2 (End a b)
+--    initBackProp :: forall b. (VFB.Vec 2 a -> b) -> VFB.Vec 2 (End a b)
+--    initBackProp bp = VF.convert $ initBackProp (bp . VF.convert :: VFB.Vec 2 a -> b)                
+--    zeroBackProp :: VFB.Vec 2 a
+--    zeroBackProp = VF.convert (zeroBackProp, zeroBackProp)
 
 type instance Tangent SimpleExpr = SimpleExpr
 
@@ -240,48 +215,49 @@ instance Basis SimpleExpr where
 --  L2Normed a -> TangentL2Normed a -> (a, a, a)
 --getTangentValues lna tlna = undefined
 
-data Vector3 a = Vector3 {x_ :: a, y_ :: a, z_ :: a}
-
-type instance Tangent (Vector3 a) = Vector3 (Tangent a)
-
-instance Additive a => 
-  Additive (Vector3 a) where
-    (Vector3 ax ay az) + (Vector3 bx by bz) = Vector3 (ax + bx) (ay + by) (az + bz)
-    zero = Vector3 zero zero zero
-
-instance Subtractive a =>
-  Subtractive (Vector3 a) where
-    (Vector3 ax ay az) - (Vector3 bx by bz) = Vector3 (ax - bx) (ay - by) (az - bz)
-
-vector3Dot :: (Distributive a) => 
-  Vector3 a -> Vector3 a -> a
-vector3Dot (Vector3 ax ay az) (Vector3 bx by bz) = ax * bx + ay * by + az * bz 
-
-scalarMul :: Multiplicative a => a -> Vector3 a -> Vector3 a
-scalarMul s (Vector3 x y z) = Vector3 (s * x) (s * y) (s * z)
-
-newtype NormedVector3 a = NormedVector3 {unsafeNV :: Vector3 a} 
-
-getNormedVector3 :: (ExpField a) =>
-  NormedVector3 a -> Vector3 a
-getNormedVector3 (NormedVector3 (Vector3 x_ y_ z_)) = 
-  Vector3 (x_ / d) (y_ / d) (z_ / d) where d = sqrt (x_ * x_ + y_ * y_ + z_ * z_)
-
-data ConstraintVector3 a b = ConstraintVector3 {
-    constraint  :: NormedVector3 a,
-    vector      :: Vector3 b
-  }
-
-getConstraintVector3 :: (ExpField a) =>
-  ConstraintVector3 a a -> Vector3 a
-getConstraintVector3 (ConstraintVector3 cv x) =
-  x - scalarMul (vector3Dot x c) c where
-    c = getNormedVector3 cv
+--data Vector3 a = Vector3 {x_ :: a, y_ :: a, z_ :: a}
+--
+--type instance Tangent (Vector3 a) = Vector3 (Tangent a)
+--
+--instance Additive a => 
+--  Additive (Vector3 a) where
+--    (Vector3 ax ay az) + (Vector3 bx by bz) = Vector3 (ax + bx) (ay + by) (az + bz)
+--    zero = Vector3 zero zero zero
+--
+--instance Subtractive a =>
+--  Subtractive (Vector3 a) where
+--    (Vector3 ax ay az) - (Vector3 bx by bz) = Vector3 (ax - bx) (ay - by) (az - bz)
+--
+--vector3Dot :: (Distributive a) => 
+--  Vector3 a -> Vector3 a -> a
+--vector3Dot (Vector3 ax ay az) (Vector3 bx by bz) = ax * bx + ay * by + az * bz 
+--
+--scalarMul :: Multiplicative a => a -> Vector3 a -> Vector3 a
+--scalarMul s (Vector3 x y z) = Vector3 (s * x) (s * y) (s * z)
+--
+--newtype NormedVector3 a = NormedVector3 {unsafeNV :: Vector3 a} 
+--
+--getNormedVector3 :: (ExpField a) =>
+--  NormedVector3 a -> Vector3 a
+--getNormedVector3 (NormedVector3 (Vector3 x_ y_ z_)) = 
+--  Vector3 (x_ / d) (y_ / d) (z_ / d) where d = sqrt (x_ * x_ + y_ * y_ + z_ * z_)
+--
+--data ConstraintVector3 a b = ConstraintVector3 {
+--    constraint  :: NormedVector3 a,
+--    vector      :: Vector3 b
+--  }
+--
+--getConstraintVector3 :: (ExpField a) =>
+--  ConstraintVector3 a a -> Vector3 a
+--getConstraintVector3 (ConstraintVector3 cv x) =
+--  x - scalarMul (vector3Dot x c) c where
+--    c = getNormedVector3 cv
 
 --    in x - scalarMul (vectorDot x v) v
 
-type instance Tangent (Vector3 a) = Vector3 (Tangent a)
-type instance Tangent (NormedVector3 a) = ConstraintVector3 a (Tangent a)
+--type instance Tangent (Vector3 a) = Vector3 (Tangent a)
+--type instance Tangent (NormedVector3 a) = ConstraintVector3 a (Tangent a)
+
 --type instance Tangent (ConstraintVector a) = ConstraintVector (Tangent a)
 
 
@@ -289,9 +265,11 @@ type instance Tangent (NormedVector3 a) = ConstraintVector3 a (Tangent a)
 --mkConstraintVector x =
 --  UnsafeConstraintVector $ \nv -> let
 --      v = getNormedVector nv
-instance Basis a => 
-  Basis (Vector3 a) where
-    type End (Vector3 a) b = Vector3 (End a b)
+
+--instance Basis a => 
+--  Basis (Vector3 a) where
+--    type End (Vector3 a) b = Vector3 (End a b)
+    
     -- basis   :: forall b. (a, T a -> b) -> End a b
 --    basis :: (Vector a, Vector (T a) -> b) -> Vector (End a b)
 --    basis (Vector x y z, bp) = Vector dx dy dz where
@@ -302,10 +280,10 @@ instance Basis a =>
 --    mkZero (Vector x y z) = Vector (mkZero x) (mkZero y) (mkZero z)
 
 
-instance (ExpField a, Basis a) =>
-  Basis (NormedVector3 a) where
-    -- type End (TangentL2Normed a) b = TangentL2Normed (End a b)
-    type End (NormedVector3 a) b = ConstraintVector3 a (End a b)
+--instance (ExpField a, Basis a) =>
+--  Basis (NormedVector3 a) where
+--    type End (NormedVector3 a) b = ConstraintVector3 a (End a b)
+
     -- basis   :: forall b. (a, T a -> b) -> End a b
     -- basis :: (NormedVector a, ConstraintVector (T a) -> b) -> End (a b)
 --        basis ((x1, x2), f) = (

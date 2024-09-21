@@ -9,7 +9,7 @@
 -- Additional orphan instances for
 -- [mumhusk](https://hackage.haskell.org/package/numhask)
 -- typeclasses.
-module NumHask.Extra () where
+module NumHask.Extra10 () where
 
 import NumHask (Additive, zero, (+))
 import Prelude hiding (Num, (+))

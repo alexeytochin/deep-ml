@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -17,6 +17,10 @@ description:    ![Second order derivative of a composition](docs/doc/images/comp
                 The original purpose of the package is an automatic backpropagation differentiation component
                 for a functional type-dependent library for deep machine learning.
                 See [tutorial](docs/InfBackprop-Tutorial.html) details.
+                .
+                Similar projects:
+                1. [ad](https://https://hackage.haskell.org/package/ad)
+                2. [backprop](https://hackage.haskell.org/package/backprop)
 category:       Mathematics
 author:         Alexey Tochin
 maintainer:     Alexey.Tochin@gmail.com
@@ -27,36 +31,31 @@ build-type:     Simple
 extra-source-files:
     CHANGELOG.md
 extra-doc-files:
+    doc/images/backprop.drawio.png
+    doc/images/backprop.png
     doc/images/composition.png
     doc/images/composition_derivative.png
     doc/images/composition_second_derivative.png
+    doc/images/lens.drawio.png
+    doc/images/lens.png
 
 library
   exposed-modules:
-      Control.CatBifunctor
-      Data.Basis2
-      Data.Basis3
-      Data.BoundedFix
+      Control.PolyFunctor
       Data.FiniteList
-      Data.Linear
-      Data.Profunctor.Extra
       Data.StreamExtra
       Debug.DiffExpr
-      Debug.DiffVars
-      InfBackprop.Common6
-      InfBackprop.LensD
-      InfBackprop.Tangent
-      InfBackprop.Tutorial2
-      InfBackprop.Vector
-      IsomorphismClass.Extra
-      IsomorphismClass.Isomorphism
       Numeric.InfBackprop
-      Optics.InfBackpropExtra
+      Numeric.InfBackprop.Diff
+      Numeric.InfBackprop.Tangent
+      Numeric.InfBackprop.Tutorial
+      Numeric.InfBackprop.TutorialExamples
+      NumHask.Extra
       Prelude.Tools
   other-modules:
       Paths_inf_backprop
   hs-source-dirs:
-      src2
+      src5
   default-extensions:
       NoImplicitPrelude
       GADTs
@@ -77,12 +76,47 @@ library
       Stream
     , base >=4.7 && <5
     , comonad
+    , composition-prelude
     , data-fix
     , deepseq
     , extra
     , finite-typelits
     , fixed-vector
     , ghc-prim
+    , isomorphism-class
+    , monad-logger
+    , numhask
+    , optics
+    , primitive
+    , profunctors
+    , safe
+    , simple-expr >=0.2.0.0
+    , text
+    , transformers
+    , unordered-containers
+    , vector
+    , vector-sized
+  default-language: Haskell2010
+
+executable mkimage
+  main-is: Main.hs
+  other-modules:
+      Paths_inf_backprop
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Stream
+    , base >=4.7 && <5
+    , comonad
+    , composition-prelude
+    , data-fix
+    , deepseq
+    , extra
+    , finite-typelits
+    , fixed-vector
+    , ghc-prim
+    , inf-backprop
     , isomorphism-class
     , monad-logger
     , numhask
@@ -110,6 +144,7 @@ test-suite doctests
       Stream
     , base >=4.7 && <5
     , comonad
+    , composition-prelude
     , data-fix
     , deepseq
     , doctest
@@ -124,7 +159,7 @@ test-suite doctests
     , primitive
     , profunctors
     , safe
-    , simple-expr
+    , simple-expr >=0.2.0.0
     , text
     , transformers
     , unordered-containers

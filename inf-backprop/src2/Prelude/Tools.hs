@@ -14,3 +14,6 @@ fork f g x = (f x, g x)
 pureKleisli :: Monad m => (a -> b) -> Kleisli m a b
 pureKleisli f = Kleisli $ pure . f
 
+
+--class Mapper a b where
+--  map :: (a -> a) -> (b -> b)
