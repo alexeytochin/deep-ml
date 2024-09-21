@@ -1,0 +1,494 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+
+module Numeric.InfBackprop.Basis where
+
+  
+import Data.Kind (Type)
+import Prelude (Float, const, undefined, ($), (==))
+import Prelude hiding (map, iterate, repeat, unzip, sum, head, tail, (!!), (+), id, (.))
+import Control.Category (Category, id, (.))
+import Data.Stream (Stream)
+--import Data.FiniteList (BoundedStream)
+import qualified Data.Vector.Generic.Sized as DVGS
+import qualified Data.Vector.Generic as DVG
+import qualified Data.Vector as DV
+--import Data.Vector.Fixed.Boxed (Vec)
+import qualified Data.Vector.Fixed.Boxed as DVFB
+import qualified Data.Vector.Fixed as DVF
+import Data.Proxy (Proxy(Proxy))
+import Prelude.Tools (cross, cross3)
+import GHC.TypeNats (Nat, KnownNat)
+import Data.Finite.Internal (Finite(Finite), getFinite)
+import NumHask (Additive, Multiplicative, Distributive, zero, one, (+), negate, (-), (/), (*))
+--import Numeric.InfBackprop.DLens (DLens(MkDLens), lensToDerivativeTuple, idDLens, derivativeTuple, derivativeOp)
+import Numeric.InfBackprop.DFunc (DLens(MkDLens), DFunc, derivativeOp)
+import GHC.Natural (Natural)
+import Data.StreamExtra (BoundedStream(BoundedStream), unitBoundedStream, basisStream, boundedStreamBasis, emptyBoundedStream)
+import Data.Stream (Stream(Cons), (<:>), repeat, iterate, map, head, tail, fromList, (!!))
+import Numeric.InfBackprop.Tangent (Tangent1, Dual, CT, T1, LongVec, Tangent)
+import Data.Foldable (foldl')
+import Control.Composition ((&))
+
+
+class HasBasis a where
+  basis1 :: forall b proxy. proxy a -> proxy b -> (CT a -> CT b) -> T1 a (CT b)
+  zeroB :: proxy a -> CT a
+
+basis :: forall a proxy. HasBasis a => proxy a -> T1 a (CT a)
+basis _ = basis1 (Proxy @a) (Proxy @a) id
+
+instance HasBasis Float where
+  basis1 _ _ f = f 1
+  zeroB _ = 0
+
+instance (HasBasis a0, HasBasis a1) => HasBasis (a0, a1) where
+  basis1 :: forall b proxy.
+    proxy (a0, a1) ->
+    proxy b ->
+    ((CT a0, CT a1) -> CT b) ->
+    (T1 a0 (CT b), T1 a1 (CT b))
+  basis1 _ _ f = (
+      basis1 (Proxy @a0) (Proxy @b) (\ctx0 -> f (ctx0, zeroB (Proxy @a1))),
+      basis1 (Proxy @a1) (Proxy @b) (\ctx1 -> f (zeroB (Proxy @a0), ctx1))
+    )
+
+  zeroB :: proxy (a0, a1) -> (CT a0, CT a1)
+  zeroB _ = (zeroB (Proxy :: Proxy a0), zeroB (Proxy :: Proxy a1))
+
+instance (HasBasis a0, HasBasis a1, HasBasis a2) => HasBasis (a0, a1, a2) where
+  basis1 :: forall b proxy.
+    proxy (a0, a1, a2) ->
+    proxy b ->
+    ((CT a0, CT a1, CT a2) -> CT b) ->
+    (T1 a0 (CT b), T1 a1 (CT b), T1 a2 (CT b))
+  basis1 _ _ f = (
+      basis1 (Proxy @a0) (Proxy @b) (\ctx0 -> f (ctx0, zeroB (Proxy @a1), zeroB (Proxy @a2))),
+      basis1 (Proxy @a1) (Proxy @b) (\ctx1 -> f (zeroB (Proxy @a0), ctx1, zeroB (Proxy @a2))),
+      basis1 (Proxy @a2) (Proxy @b) (\ctx2 -> f (zeroB (Proxy @a0), zeroB (Proxy @a1), ctx2))
+    )
+
+  zeroB :: proxy (a0, a1, a2) -> (CT a0, CT a1, CT a2)
+  zeroB = const (zeroB (Proxy :: Proxy a0), zeroB (Proxy :: Proxy a1), zeroB (Proxy :: Proxy a2))
+
+
+longVecBasis :: (DVG.Vector v a, KnownNat n) =>
+  Finite n -> a -> a -> DVGS.Vector v n a
+longVecBasis k zero' one' = DVGS.generate $ \l ->
+  if k == l
+    then one'
+    else zero'
+
+
+instance (KnownNat n, HasBasis a) => HasBasis (LongVec n a) where
+  basis1 :: forall b proxy. proxy (LongVec n a) -> proxy b -> (LongVec n (CT a) -> CT b) -> LongVec n (T1 a (CT b))
+  basis1 _ _ f = DVGS.generate $ \k -> basis1 (Proxy @a) (Proxy @b) (f . longVecBasis k (zeroB (Proxy @a)))
+
+  zeroB :: proxy (LongVec n a) -> LongVec n (CT a)
+  zeroB _ = DVGS.replicate (zeroB (Proxy :: Proxy a))
+
+
+sBasis :: Natural -> a -> a -> BoundedStream a
+sBasis n zero' one' = basisStream zero' one' !! fromIntegral n
+
+instance (HasBasis a) => HasBasis (Stream a) where
+  basis1 :: forall b proxy. proxy (Stream a) -> proxy b -> (BoundedStream (CT a) -> CT b) -> Stream (T1 a (CT b))
+  basis1 _ _ f = map
+    (\n -> basis1 (Proxy @a) (Proxy @b) (\x -> f (boundedStreamBasis (zeroB (Proxy @a)) x n)))
+    (fromList [0 ..])
+  zeroB :: proxy (Stream a) -> BoundedStream (CT a)
+  zeroB _ = unitBoundedStream $ zeroB (Proxy @a)
+
+instance (HasBasis a) => HasBasis (BoundedStream a) where
+--  basis1 :: forall b proxy. proxy (BoundedStream a) -> proxy b -> (Stream (CT a) -> CT b) -> BoundedStream (T1 a (CT b))
+--  basis1 _ f bs = undefined -- BoundedStream $ fromList $ fmap (basis1   ) ()
+  -- basis1 _ f bs = undefined -- BoundedStream $ fromList $ fmap (basis1   ) ()
+  zeroB :: proxy (BoundedStream a) -> Stream (CT a)
+  zeroB _ = repeat $ zeroB (Proxy @a)
+
+
+--tupleToDFunc :: (Additive (CT t)) =>
+--  (DFunc t x0, DFunc t x1) -> DFunc t (x0, x1)
+--tupleToDFunc (MkDFunc d0, MkDFunc d1) = MkDFunc d where
+--  f t = ((y0, y1), (h0, h1)) where
+--    (y0, h0) = f0 t
+--    (y1, h1) = f1 t
+--  b ((cy0, cy1), (h0, h1)) = cx0 + cx1 where
+--    cx0 = b0 (cy0, h0)
+--    cx1 = b1 (cy1, h1)
+--tupleToLens :: (Additive ct) =>
+--  (DLens ct t ca0 a0, DLens ct t ca1 a1) -> DLens ct t (ca0, ca1) (a0, a1)
+--tupleToLens (MkDLens d0, MkDLens d1) = DLens $ \t -> let
+--    (x0, cxt0) = d0 t
+--    (x1, cxt1) = d1 t
+--  in ((x0, x1), \(cx0, cx1) -> cxt0 cx0 + cxt1 cx1)
+
+--tripleToDFunc :: (Additive ct) =>
+--  (DLens ct t ca0 a0, DLens ct t ca1 a1 DLens ct t ca2 a2) -> DLens ct t (ca0, ca1, ca2) (a0, a1, a2)
+--tripleToDFunc (MkDLens d0, MkDLens d1, MkDLens d2) = MkDLens $ \t -> let
+--    (x0, cxt0) = d0 t
+--    (x1, cxt1) = d1 t
+--    (x2, cxt2) = d2 t
+--  in ((x0, x1, x2), \(cx0, cx1, cx2) -> cxt0 cx0 + cxt1 cx1 + cxt2 cx2)
+
+
+
+
+--longVecToDFunc :: forall n t a. (Additive (CT t)) =>
+--  LongVec n (DFunc t a) ->
+--  DFunc t (LongVec n a)
+----longVecToDFunc vec = MkDFunc (f :: t -> (DVGS.Vector v n a, DVGS.Vector v n h)) (b :: (CT (DVGS.Vector v n a), DVGS.Vector v n h) -> CT t) where
+--longVecToDFunc vec = MkDFunc
+--    (f :: t -> (LongVec n a, LongVec n h))
+--    (b :: (LongVec n (CT a), LongVec n h) -> CT t)
+--  where
+----  f = undefined
+--  f t = DVGS.unzip tVec :: (LongVec n a, LongVec n h) where
+--    tVec = fmap (\(MkDFunc (for :: t -> (a, h)) _) -> for t :: (a, h)) vec :: LongVec n (a, h)
+--  b = undefined
+--  b ((cy0, cy1, cy2), (h0, h1, h2)) = cx0 + cx1 + cx2 where
+--    cx0 = b0 (cy0, h0)
+--    cx1 = b1 (cy1, h1)
+--    cx2 = b2 (cy2, h2)
+--longVecToDFunc :: forall n ct t ca a. (Additive (CT t)) =>
+--  LongVec n (DLens ct t ca a) ->
+--  DLens ct t (LongVec n ca) (LongVec n a)
+--longVecToDFunc vec = MkDLens $ \t -> let
+
+
+
+
+--dFuncToTuple :: (Additive (CT a0), Additive (CT a1)) =>
+--  DFunc t (a0, a1) -> (DFunc t a0, DFunc t a1)
+--dFuncToTuple (MkDFunc f b) = (MkDFunc f0 b0, MkDFunc f1 b1) where
+--  f0 = cross fst id . f
+--  f1 = cross snd id . f
+--  b0 = \(cy0, h) -> b ((cy0, zero), h)
+--  b1 = \(cy1, h) -> b ((zero, cy1), h)
+
+--tupleToLens :: (Additive dt) =>
+--  (DLens dt t dx0 x0, DLens dt t dx1 x1) -> DLens dt t (dx0, dx1) (x0, x1)
+--tupleToLens (MkDLens f0 b0, MkDLens f1 b1) = MkDLens f b where
+--  f t = ((y0, y1), (h0, h1)) where
+--    (y0, h0) = f0 t
+--    (y1, h1) = f1 t
+--  b ((cy0, cy1), (h0, h1)) = cx0 + cx1 where
+--    cx0 = b0 (cy0, h0)
+--    cx1 = b1 (cy1, h1)
+--
+--lensToTuple :: (Additive ca0, Additive ca1) =>
+--  DLens dt t (ca0, ca1) (a0, a1) -> (DLens dt t ca0 a0, DLens dt t ca1 a1)
+--lensToTuple (MkDLens f b) = (MkDLens f0 b0, MkDLens f1 b1) where
+--  f0 = cross fst id . f
+--  f1 = cross snd id . f
+--  b0 = \(cy0, h) -> b ((cy0, zero), h)
+--  b1 = \(cy1, h) -> b ((zero, cy1), h)
+
+
+--  a0 = \t -> let
+--      ((x0, _), dxt) = a t
+--    in (x0, \dx0 -> dxt (dx0, zero))
+--  a1 = \t -> let
+--      ((_, x1), dxt) = a t
+--    in (x1, \dx1 -> dxt (zero, dx1))
+
+-- Temp
+constOne :: Multiplicative a => a -> a
+constOne = const one
+
+-- Temp
+constZero :: Additive a => a -> a
+constZero = const zero
+
+scalarDerivative :: forall a b. (
+    Distributive (CT b)
+  ) =>
+  (DFunc a a -> DFunc a b) ->
+  a ->
+  CT a
+scalarDerivative func = derivativeOp func (const one)
+
+--floatDerivative ::  forall a b. (
+--    Distributive (CT b)
+--  ) =>
+--  (DLens (CT a) a (CT a) a -> DLens (CT a) a (CT b) b) ->
+--  a ->
+--  CT a
+--floatDerivative func = derivativeOp func (const one)
+--floatDerivative func x = (snd . derivativeTuple func x) one -- tupleDerivative_ (tupleToLens . f)
+
+--tupleDerivative_ :: forall a b0 b1.
+--  (Distributive (CT b0), Distributive (CT b1)) =>
+--    (DFunc a a -> DFunc a (b0, b1)) ->
+--    a ->
+--    (CT a, CT a)
+--tupleDerivative_ func x = (bp (one, zero), bp (zero, one)) where
+--  ((_, _), bp) = derivativePair func x -- :: (cb, cb) -> ca
+
+--tupleDerivative_ :: forall a ca b0 b1.
+--  (Distributive (CT b0), Distributive (CT b1)) =>
+--    (DLens ca a ca a -> DLens ca a (CT b0, CT b1) (b0, b1)) ->
+--    a -> (ca, ca)
+--tupleDerivative_ func x = (bp (one, zero), bp (zero, one)) where
+--  ((_, _), bp) = derivativeTuple func x -- :: (cb, cb) -> ca
+
+--tupleDerivative__ :: (
+--    Distributive (CT b0),
+--    Distributive (CT b1),
+--    Additive (CT a)
+--  ) =>
+--  (DFunc a a -> (DFunc a b0, DFunc a b1)) ->
+--  a ->
+--  (CT a, CT a)
+--tupleDerivative__ f = tupleDerivative_ (tupleToDFunc . f)
+--
+--tupleDerivative :: forall a b0 b1. (
+--    Distributive (CT b0),
+--    Distributive (CT b1),
+--    Additive (CT a)
+--  ) =>
+--    (DFunc a b0, DFunc a b1) ->
+--    a ->
+--    (CT a, CT a)
+--tupleDerivative tupleOfDFunc x = (bp0 one + bp1 zero, bp0 zero + bp1 one) where
+--  bp0 = snd $ lensToDerivativePair (fst tupleOfDFunc) x :: CT b0 -> CT a
+--  bp1 = snd $ lensToDerivativePair (snd tupleOfDFunc) x :: CT b1 -> CT a
+
+
+
+--tupleDerivative1 :: forall a b0 b1 cta. (
+--    Distributive (CT b0),
+--    Distributive (CT b1),
+--    Additive (CT a)
+--  ) =>
+--    (DFunc a b0, DFunc a b1) ->
+--    (a -> cta) ->
+--    a ->
+--    (CT a, CT a)
+--tupleDerivative1 tupleOfDFunc x = (bp0 one + bp1 zero, bp0 zero + bp1 one) where
+--  bp0 = snd $ lensToDerivativePair (fst tupleOfDFunc) x :: CT b0 -> CT a
+--  bp1 = snd $ lensToDerivativePair (snd tupleOfDFunc) x :: CT b1 -> CT a
+
+
+
+
+longVecSum :: Additive a => LongVec n a -> a
+longVecSum = foldl' (+) zero
+
+--longVecBasis :: (DVG.Vector v a, KnownNat n) =>
+--  Finite n -> a -> a -> DVGS.Vector v n a
+
+--vectorDerivative :: forall n a b. (
+--    KnownNat n,
+--    Distributive (CT b),
+--    Additive (CT a)
+--  ) =>
+--  LongVec n (DFunc a b) ->
+--  a ->
+--  LongVec n (CT a)
+--vectorDerivative vecOfDFunc x = DVGS.generate $ longVecSum . DVGS.zipWith ($) vecOfBp . basisL where -- (\k -> DVGS.map ($) vecOfBp (basisL k))
+--  basisL k = longVecBasis k zero one :: LongVec n (CT b)
+--  vecOfBp = fmap snd vecOfPairs :: LongVec n (CT b -> CT a)
+--  vecOfPairs = fmap (`lensToDerivativePair` x) vecOfDFunc :: LongVec n (b, CT b -> CT a)
+--
+--  temp1 ctb = fmap ((ctb &) . snd . (`lensToDerivativePair` x)) vecOfDFunc :: LongVec n (CT a)
+  -- temp = fmap (snd . (`lensToDerivativePair` x)) vecOfDFunc :: LongVec n (CT b -> CT a)
+  -- temp k = fmap (\dfunc -> (snd (lensToDerivativePair dfunc x)) (basisL k) :: CT a) vecOfDFunc :: LongVec n (CT a)
+
+--dFuncToDerivative :: DFunc a b -> (b -> CT b) -> a -> CT a
+--dFuncToDerivative (MkDFunc f b) cvf = b . cross cvf id . f
+
+--simpleDerivative :: Multiplicative (CT b) => 
+--  DFunc a b -> a -> CT a
+--simpleDerivative dFunc = dFuncToDerivative dFunc (const one)
+--
+--tupleDerivative1 :: (
+--    KnownNat n
+----    Distributive (CT b),
+----    Additive (CT a)
+--  ) =>
+--  (c -> ((cta0, cta0), (cta1, cta1))) ->
+--  (c0, c1) ->
+--  (cta0, cta1)
+--tupleDerivative1 zeroAndOne vec = undefined
+--
+--longVecMap :: (a -> b) -> (LongVec n a -> LongVec n b)
+--longVecMap = fmap
+
+--vectorDerivative1 :: (
+--    KnownNat n
+----    Distributive (CT b),
+----    Additive (CT a)
+--  ) =>
+----  (c -> (cta, cta)) ->
+----  LongVec n c ->
+----  LongVec n cta
+----  (b -> c -> CT c) ->
+----  (b -> LongVec n a -> LongVec n (CT a))
+--  (c -> a -> cta) ->
+--  LongVec n c -> 
+--  a ->
+--  LongVec n cta
+----  (c -> cta) ->
+----  LongVec n c -> 
+----  LongVec n cta
+--vectorDerivative1 zeroAndOne vec = undefined
+
+
+--temp :: forall n a b. (
+--    KnownNat n,
+--    Distributive (CT b),
+--    Additive (CT a)
+--  ) =>
+--    LongVec n (DFunc a b) ->
+--    a ->
+--    LongVec n (CT a)
+--temp vecOfDFunc x = vectorDerivative1 (const (constDFunc zero, constDFunc one)) 
+
+
+--dFst :: Additive (CT b) => DFunc (a, b) a
+--dFst = MkDFunc f b where
+--  f (x, _) = (x, ())
+--  b (cx, _) = (cx, zero)
+--
+--dSnd :: Additive (CT a) => DFunc (a, b) b
+--dSnd = MkDFunc f b where
+--  f (_, y) = (y, ())
+--  b (cy, _) = (zero, cy)
+--
+--
+--tupleGradient :: forall a b c. (
+--    Additive (CT a),
+--    Additive (CT b),
+--    Distributive (CT c)
+--  ) =>
+--  ((DFunc (a, b) a, DFunc (a, b) b) -> DFunc (a, b) c) ->
+--  (a, b) ->
+--  (CT a, CT b)
+--tupleGradient func t = bp one where
+--  (_, bp) = lensToDerivativePair (func (dFst, dSnd)) t
+----tupleGradient func t = (fst $ lensToDerivativePair (func (dFst, dSnd)) t) one
+
+
+--tupleDerivative :: (
+--    Distributive (CT b0),
+--    Distributive (CT b1),
+--    Additive (CT a)
+--  ) =>
+--  (DLens (CT a) a (CT a) a -> (DLens (CT a) a (CT b0) b0, DLens (CT a) a (CT b1) b1)) ->
+--  a ->
+--  (CT a, CT a)
+--tupleDerivative f = tupleDerivative_ (tupleToLens . f)
+
+
+--class BackProp a where
+
+
+class InitBackProp a where
+  type Field a :: Type
+  type Out a :: Type
+  initBackProp :: a -> Field a -> Out a
+
+--  (DFunc a a -> DFunc a b) ->
+--  a ->
+--  CT a
+
+
+--  (DFunc a a -> (DFunc a b0, DFunc a b1)) ->
+--  a ->
+--  (CT a, CT a)
+
+--  (DFunc a a -> LongVec a b) ->
+--  a ->
+--  LongVec n (DFunc a b)
+
+--  ((DFunc (a, b) a, DFunc (a, b) b) -> DFunc (a, b) c) ->
+--  (a, b) ->
+--  (CT a, CT b)
+
+--  LongVec n b -> (b, b)
+--  (LongVec n (DFunc a b) -> (DFunc a b0, DFunc a b1))->
+--  (a, b) ->
+--  (CT a, CT b)
+
+--instance (
+--    Multiplicative (CT b)
+--  ) =>
+--  InitBackProp (DFunc a b) where
+--    type Field (DFunc a b) = a
+--    type Out (DFunc a b) = CT a
+--    initBackProp dFunc x = snd (lensToDerivativePair dFunc x) one
+--
+--instance (
+--    Distributive (CT b0),
+--    Distributive (CT b1),
+--    Additive (CT a)
+--  ) =>
+--  InitBackProp (DFunc a b0, DFunc a b1) where
+--    type Field (DFunc a b0, DFunc a b1) = a
+--    type Out (DFunc a b0, DFunc a b1) = (CT a, CT a)
+--    initBackProp tupleOfDFunc x = (bp0 one + bp1 zero, bp0 zero + bp1 one) where
+--      bp0 = snd $ lensToDerivativePair (fst tupleOfDFunc) x :: CT b0 -> CT a
+--      bp1 = snd $ lensToDerivativePair (snd tupleOfDFunc) x :: CT b1 -> CT a
+--
+--instance (
+--    KnownNat n,
+--    Distributive (CT b),
+--    Additive (CT a)
+--  ) =>
+--  InitBackProp (LongVec n (DFunc a b)) where
+--    type Field (LongVec n (DFunc a b)) = a
+--    type Out (LongVec n (DFunc a b)) = LongVec n (CT a)
+--
+--    initBackProp :: LongVec n (DFunc a b) -> a -> LongVec n (CT a)
+--    initBackProp tupleOfDFunc x = DVGS.generate $ longVecSum . DVGS.zipWith ($) vecOfBp . basisL where
+--      basisL k = longVecBasis k zero one :: LongVec n (CT b)
+--      vecOfBp = fmap snd vecOfPairs :: LongVec n (CT b -> CT a)
+--      vecOfPairs = fmap (`lensToDerivativePair` x) tupleOfDFunc :: LongVec n (b, CT b -> CT a)
+--
+--instance (
+--    KnownNat n,
+--    Distributive (CT b),
+--    Additive (CT a)
+--  ) =>
+--  InitBackProp (Stream (DFunc a b)) where
+--    type Field (Stream (DFunc a b)) = a
+--    type Out (Stream (DFunc a b)) = BoundedStream (CT a)
+--
+--    initBackProp :: Stream (DFunc a b) -> a -> BoundedStream (CT a)
+--    initBackProp tupleOfDFunc x = undefined -- DVGS.generate $ longVecSum . DVGS.zipWith ($) vecOfBp . basisL where
+--      basisL k = longVecBasis k zero one :: LongVec n (CT b)
+--      vecOfBp = fmap snd vecOfPairs :: LongVec n (CT b -> CT a)
+--      vecOfPairs = fmap (`lensToDerivativePair` x) tupleOfDFunc :: LongVec n (b, CT b -> CT a)
+
+
+--initBackProp :: forall a proxy. HasBasis a => proxy a -> T1 a (CT a)
+--initBackProp _ = basis1 (Proxy @a) (Proxy @a) id
+
+  
+-- class HasBasis a where
+--  basis1 :: forall b proxy. proxy a -> proxy b -> (CT a -> CT b) -> T1 a (CT b)
+--  zeroB :: proxy a -> CT a
+
+--basis :: forall a proxy. HasBasis a => proxy a -> T1 a (CT a)
+--basis _ = basis1 (Proxy @a) (Proxy @a) id
+--
+--instance HasBasis Float where
+--  basis1 _ _ f = f 1
+--  zeroB _ = 0
+--
+--instance (HasBasis a0, HasBasis a1) => HasBasis (a0, a1) where
+--  basis1 :: forall b proxy.
+--    proxy (a0, a1) ->
+--    proxy b ->
+--    ((CT a0, CT a1) -> CT b) ->
+--    (T1 a0 (CT b), T1 a1 (CT b))
+--  basis1 _ _ f = (
+--    basis1 (Proxy @a0) (Proxy @b) (\ctx0 -> f (ctx0, zeroB (Proxy @a1))),
+--    basis1 (Proxy @a1) (Proxy @b) (\ctx1 -> f (zeroB (Proxy @a0), ctx1))
+--  )
+--
+--zeroB :: proxy (a0, a1) -> (CT a0, CT a1)
+--zeroB _ = (zeroB (Proxy :: Proxy a0), zeroB (Proxy :: Proxy a1))
