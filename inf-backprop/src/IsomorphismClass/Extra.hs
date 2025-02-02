@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -9,13 +10,19 @@
 -- Extra instances for 'IsomorphicTo' typeclass from 'isomorphism-class' package.
 module IsomorphismClass.Extra () where
 
+#if MIN_VERSION_isomorphism_class(0,3,0)
+#else
 import Control.Category (id)
+#endif
 import Data.Void (Void, absurd)
 import IsomorphismClass (IsomorphicTo, to)
 import Prelude (Either (Left, Right), fst, snd)
 
+#if MIN_VERSION_isomorphism_class(0,3,0)
+#else
 instance {-# INCOHERENT #-} IsomorphicTo a a where
   to = id
+#endif
 
 -- Type products
 
