@@ -16,8 +16,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Stack
-        run: curl -sSL https://get.haskellstack.org/ | sh
+      - name: Upgrade Stack
+        run: stack upgrade
 
       - name: Set up Stack with LTS Snapshot
         run: stack --resolver ${{ matrix.lts }} setup
