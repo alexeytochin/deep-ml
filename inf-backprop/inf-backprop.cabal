@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -11,8 +11,9 @@ description:    ![Second order derivative of a composition](docs/doc/images/comp
                 .
                 Automatic differentiation and backpropagation.
                 We do not attract gradient tape.
-                Instead, the differentiation operator is defined directly as a map between differentiable function
-                objects. Such functions are to be combined in arrow style using '(>>>)', '(***)', 'first', etc.
+                Instead, the differentiation operator is defined directly as a map between differentiable function objects.
+                Such functions are to be combined in arrow style using '(>>>)', '(***)', 'first', etc.
+                .
                 The original purpose of the package is an automatic backpropagation differentiation component
                 for a functional type-dependent library for deep machine learning.
                 See [tutorial](docs/InfBackprop-Tutorial.html) details.
