@@ -1,0 +1,40 @@
+name: Haskell Stack CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lts: ['lts-20.18', 'lts-20.26', 'lts-21.0', 'lts-21.20', 'lts-21.22', 'lts-22.0', 'lts-23.0', 'nightly']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Stack
+        run: curl -sSL https://get.haskellstack.org/ | sh
+
+      - name: Set up Stack with LTS Snapshot
+        run: stack --resolver ${{ matrix.lts }} setup
+
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-stack-${{ matrix.lts }}-${{ hashFiles('stack.yaml', 'package.yaml', '**/*.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-stack-${{ matrix.lts }}-
+
+      - name: Install Dependencies
+        run: stack --resolver ${{ matrix.lts }} build --only-dependencies
+
+      - name: Formatting
+        run: hlint .
+
+      - name: Build All Packages
+        run: stack --resolver ${{ matrix.lts }} build --fast --haddock --test --bench --no-run-benchmarks
