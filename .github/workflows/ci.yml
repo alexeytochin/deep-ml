@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        lts: ['lts-20.18', 'lts-20.26', 'lts-21.0', 'lts-21.20', 'lts-21.22', 'lts-22.0']
+        lts: ['lts-20.18', 'lts-20.26', 'lts-21.0', 'lts-21.20', 'lts-21.22', 'lts-22.0', 'lts-23.0', 'nightly']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
