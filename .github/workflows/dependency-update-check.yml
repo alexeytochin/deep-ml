@@ -1,0 +1,33 @@
+name: Stack Project Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 7'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Stack
+        uses: actions/setup-haskell@v1
+        with:
+          ghc-version: "latest"
+
+      - name: Install dependencies with Stack
+        run: stack setup && stack build --dependencies-only
+
+      - name: Check outdated dependencies for all packages
+        run: stack exec -- cabal outdated
+
+      - name: Build all packages
+        run: stack build --all
