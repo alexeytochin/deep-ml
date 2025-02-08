@@ -36,4 +36,4 @@ jobs:
           cd ..
 
       - name: Build all packages
-        run: stack build --all
+        run: stack build
