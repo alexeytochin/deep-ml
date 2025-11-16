@@ -58,13 +58,6 @@ import NumHask
   )
 import Numeric.InfBackprop.Utils.Tuple (biCross, biCross3, cross, cross3)
 
--- | Version-specific imports and instances.
--- These are needed for compatibility with different numhask versions.
-#if MIN_VERSION_numhask(0,11,0)
-#else
-import NumHask (Distributive, Field, Ring)
-#endif
-
 -- | Instances for NumHask classes for common data types.
 -- These instances follow the standard lifting of operations to container types.
 --
@@ -101,13 +94,6 @@ instance
   where
   recip = cross recip recip
   (/) = biCross (/) (/)
-
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance (Distributive a0, Distributive a1) => Distributive (a0, a1)
-instance (Ring a0, Ring a1) => Ring (a0, a1)
-instance (Field a0, Field a1) => Field (a0, a1)
-#endif
 
 -- | Tuple instance of `ExpField` typeclass.
 instance
@@ -181,14 +167,6 @@ instance
   recip = cross3 recip recip recip
   (/) = biCross3 (/) (/) (/)
 
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance (Distributive a0, Distributive a1, Distributive a2) => 
-  Distributive (a0, a1, a2)
-instance (Ring a0, Ring a1, Ring a2) => Ring (a0, a1, a2)
-instance (Field a0, Field a1, Field a2) => Field (a0, a1, a2)
-#endif
-
 -- | Triple instance of `ExpField`.
 instance
   (ExpField a0, ExpField a1, ExpField a2) =>
@@ -259,13 +237,6 @@ instance
   Divisive (DVGS.Vector v n a)
   where
   (/) = DVGS.zipWith (/)
-
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance (KnownNat n, Distributive a, DVG.Vector v a) => Distributive (DVGS.Vector v n a)
-instance (KnownNat n, Ring a, DVG.Vector v a) => Ring (DVGS.Vector v n a) where
-instance (KnownNat n, Field a, DVG.Vector v a) => Field (DVGS.Vector v n a) where
-#endif
 
 -- | Sized Vector instance of `ExpField` typeclass.
 instance
@@ -339,13 +310,6 @@ instance
   recip = fmap recip
   (/) = liftA2 (/)
 
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance Maybe a => Distributive (DS.Stream a)
-instance Ring a => Ring (DS.Stream a) where
-instance Field a => Field (DS.Stream a) where
-#endif
-
 -- | `Data.Stream.Stream` instances  of `ExpField` typeclass.
 instance
   (ExpField a) =>
@@ -417,13 +381,6 @@ instance
   where
   recip = fmap recip
   (/) = liftA2 (/)
-
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance Maybe a => Distributive (Maybe a)
-instance Ring a => Ring (Maybe a)
-instance Field a => Field (Maybe a)
-#endif
 
 -- | `Maybe` instance of `ExpField`.
 instance

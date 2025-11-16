@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports -fno-warn-missing-export-lists #-}
 
@@ -303,11 +302,6 @@ instance (Subtractive a, Show a) => Subtractive (Traced a) where
 instance (Multiplicative a, Show a) => Multiplicative (Traced a) where
   (*) = addTraceBinary "(*)" (NumHask.*)
   one = MkTraced one
-
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance Distributive Traced
-#endif
 
 -- | NumHask `Divisive` instance for division operations.
 instance (Divisive a, Show a) => Divisive (Traced a) where

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -315,19 +314,9 @@ instance Multiplicative SimpleExpr where
   one = number 1
   (*) = binaryFunc "*"
 
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance NH.Distributive SimpleExpr
-#endif
-
 -- | `SimpleExpr` instance of `NumHask.Divisive` typeclass.
 instance Divisive SimpleExpr where
   (/) = binaryFunc "/"
-
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance NH.Field SimpleExpr
-#endif
 
 -- | `SimpleExpr` instance of `NumHask.ExpField` typeclass.
 instance ExpField SimpleExpr where

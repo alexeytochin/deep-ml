@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
@@ -1219,13 +1218,6 @@ instance
   where
   one = constDiff one
   (*) = differentiableMult .: twoArgsToTuple
-
-#if MIN_VERSION_numhask(0,11,0)
-#else
-instance (Additive (CT a), b ~ CT b, Distributive b) => Distributive (RevDiff' a b)
-instance (Additive (CT a), Ring b) => Ring (RevDiff' a b)
-instance (Additive (CT a), Field b) => Field (RevDiff' a b)
-#endif
 
 instance
   (MultiplicativeAction Integer b, MultiplicativeAction Integer cb) =>
