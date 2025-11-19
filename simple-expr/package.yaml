@@ -6,8 +6,11 @@ maintainer: Alexey.Tochin@gmail.com
 copyright: 2024 Alexey Tochin
 extra-source-files:
 - CHANGELOG.md
+- doc/images/*.png
+- main_page_images/*.png
 extra-doc-files:
 - doc/images/*.png
+- main_page_images/*.png
 synopsis: Minimalistic toolkit for simple mathematical expression.
 category: Mathematics
 description:
@@ -29,13 +32,13 @@ description:
   \n\n
   Besides an expression visualization feature is also provided.
   \n\n
-  ![image description](doc/images/imaginary_expr_sum.png)
+  ![image description](docs/doc/images/imaginary_expr_sum.png)
   \n\n
   See 
-  [tutorial](Debug-SimpleExpr-Tutorial.html) 
+  [tutorial](docs/Debug-SimpleExpr-Tutorial.html) 
   for details."
 dependencies:
-- base >= 4.7 && < 5
+- base >= 4.19 && < 5
 - text
 - numhask
 - graphviz
@@ -95,7 +98,15 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -ddump-tc-trace
-    - -dppr-debug
     dependencies:
     - doctest
+    - Stream < 0.5
+    - data-fix < 0.4
+    - graphite < 0.11
+    - graphviz < 2999.21
+    - hashable < 1.6
+    - numhask < 0.14
+    - text < 2.2
+    - unicode-show < 0.2
+    - vector < 0.14
+    - vector-sized < 1.7

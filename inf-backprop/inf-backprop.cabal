@@ -7,18 +7,20 @@ cabal-version: 1.18
 name:           inf-backprop
 version:        0.2.0.0
 synopsis:       Automatic differentiation and backpropagation.
-description:    ![Second order derivative of a composition](doc/images/composition_second_derivative.png) 
+description:    ![Second order derivative of a composition](docs/doc/images/composition_second_derivative.png) 
                 .
                  Automatic differentiation library with efficient reverse-mode backpropagation for Haskell. 
                 .
-                 This package provides a general-purpose automatic differentiation system designed for building strongly typed deep learning frameworks. It offers: 
+                 This package provides a general-purpose automatic differentiation system designed
+                 for building strongly typed deep learning frameworks. It offers:
                 .
-                 * Reverse-mode automatic differentiation (backpropagation)
-                * Support for higher-order derivatives 
+                 * Reverse-mode automatic differentiation (backpropagation) 
                 .
-                 * Type-safe gradient computation
-                * Integration with NumHask for polymorphic numeric operations
+                 * Support for higher-order derivatives 
                 .
+                 * Type-safe gradient computation 
+                .
+                 * Integration with [numhask](https://hackage.haskell.org/package/numhask) 
                 .
                  * Flexible representations including profunctor and Van Laarhoven encodings 
                 .
@@ -26,7 +28,7 @@ description:    ![Second order derivative of a composition](doc/images/compositi
                 for research, prototyping neural networks, and implementing custom
                 differentiable algorithms. 
                 .
-                 See the [tutorial](Numeric-InfBackprop-Tutorial.html) for detailed
+                 See the [tutorial](docs/Numeric-InfBackprop-Tutorial.html) for detailed
                 examples and usage patterns. 
                 .
                  Similar Projects: 
@@ -43,6 +45,13 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     CHANGELOG.md
+    doc/images/backprop.drawio.png
+    doc/images/backprop.png
+    doc/images/composition.png
+    doc/images/composition_derivative.png
+    doc/images/composition_second_derivative.png
+    doc/images/lens.drawio.png
+    doc/images/lens.png
 extra-doc-files:
     doc/images/backprop.drawio.png
     doc/images/backprop.png
@@ -122,7 +131,7 @@ test-suite doctests
       Paths_inf_backprop
   hs-source-dirs:
       doctests
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -w -threaded -rtsopts -with-rtsopts=-N -ddump-tc-trace -dppr-debug
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -w -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Stream
     , base >=4.7 && <5

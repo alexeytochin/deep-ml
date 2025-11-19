@@ -35,7 +35,7 @@ module Numeric.InfBackprop.Tutorial
     -- ** Siskind-Pearlmutter Example #quick-start-siskind-pearlmutter-example#
     -- $quick-start-siskind-pearlmutter-example
 
-    -- * How it Works #how-it-works#
+    -- * How it Works
     -- $how-it-works
 
     -- ** The Backpropagation Derivative #how-it-works-backpropagation#
@@ -1944,14 +1944,15 @@ import Numeric.InfBackprop.Utils.Tuple (cross)
 --
 -- Now consider the more complex function:
 --
--- >>> simplify $ forwardV1 x :: Traced SimpleExpr
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
--- k(g(f(x)),h(f(x)))
+-- > >>> simplify $ forwardV1 x :: Traced SimpleExpr
+-- >  <<< TRACING: Calculating f of x >>>
+-- >  <<< TRACING: Calculating g of f(x) >>>
+-- >  <<< TRACING: Calculating h of f(x) >>>
+-- >  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
+-- > k(g(f(x)),h(f(x)))
 --
--- Note that @f x@ is only computed once and its result reused,
+-- The output may vary in order, depending on GHC's optimizations, but importantly,
+-- note that @f x@ is only computed once and its result is reused,
 -- thanks to the local binding.
 --
 -- By contrast, if we define @forwardV2@
@@ -1964,13 +1965,13 @@ import Numeric.InfBackprop.Utils.Tuple (cross)
 --
 -- the tracing output will show redundant evaluations:
 --
--- >>> simplify $ forwardV2 x :: Traced SimpleExpr
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
--- k(g(f(x)),h(f(x)))
+-- > >>> simplify $ forwardV2 x :: Traced SimpleExpr
+-- >  <<< TRACING: Calculating f of x >>>
+-- >  <<< TRACING: Calculating g of f(x) >>>
+-- >  <<< TRACING: Calculating f of x >>>
+-- >  <<< TRACING: Calculating h of f(x) >>>
+-- >  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
+-- > k(g(f(x)),h(f(x)))
 --
 -- Here, @f x@ is computed twice.
 -- This illustrates that /GHC does not always automatically eliminate subexpressions/.
@@ -1979,23 +1980,23 @@ import Numeric.InfBackprop.Utils.Tuple (cross)
 -- In the long output below, observe that @f'@
 -- is /not/ computed twice during the backward pass:
 --
--- >>> simplify $ simpleDerivative forwardV1 x :: Traced SimpleExpr
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
---  <<< TRACING: Calculating (*) of k'_1(g(f(x)),h(f(x))) and 1 >>>
---  <<< TRACING: Calculating (*) of g'(f(x)) and k'_1(g(f(x)),h(f(x)))*1 >>>
---  <<< TRACING: Calculating (*) of f'(x) and g'(f(x))*(k'_1(g(f(x)),h(f(x)))*1) >>>
---  <<< TRACING: Calculating h' of f(x) >>>
---  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
---  <<< TRACING: Calculating (*) of k'_2(g(f(x)),h(f(x))) and 1 >>>
---  <<< TRACING: Calculating (*) of h'(f(x)) and k'_2(g(f(x)),h(f(x)))*1 >>>
---  <<< TRACING: Calculating (*) of f'(x) and h'(f(x))*(k'_2(g(f(x)),h(f(x)))*1) >>>
---  <<< TRACING: Calculating (+) of f'(x)*(g'(f(x))*(k'_1(g(f(x)),h(f(x)))*1)) and f'(x)*(h'(f(x))*(k'_2(g(f(x)),h(f(x)))*1)) >>>
--- (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
+-- > >>> simplify $ simpleDerivative forwardV1 x :: Traced SimpleExpr
+-- >  <<< TRACING: Calculating f' of x >>>
+-- >  <<< TRACING: Calculating f of x >>>
+-- >  <<< TRACING: Calculating g' of f(x) >>>
+-- >  <<< TRACING: Calculating g of f(x) >>>
+-- >  <<< TRACING: Calculating h of f(x) >>>
+-- >  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
+-- >  <<< TRACING: Calculating (*) of k'_1(g(f(x)),h(f(x))) and 1 >>>
+-- >  <<< TRACING: Calculating (*) of g'(f(x)) and k'_1(g(f(x)),h(f(x)))*1 >>>
+-- >  <<< TRACING: Calculating (*) of f'(x) and g'(f(x))*(k'_1(g(f(x)),h(f(x)))*1) >>>
+-- >  <<< TRACING: Calculating h' of f(x) >>>
+-- >  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
+-- >  <<< TRACING: Calculating (*) of k'_2(g(f(x)),h(f(x))) and 1 >>>
+-- >  <<< TRACING: Calculating (*) of h'(f(x)) and k'_2(g(f(x)),h(f(x)))*1 >>>
+-- >  <<< TRACING: Calculating (*) of f'(x) and h'(f(x))*(k'_2(g(f(x)),h(f(x)))*1) >>>
+-- >  <<< TRACING: Calculating (+) of f'(x)*(g'(f(x))*(k'_1(g(f(x)),h(f(x)))*1)) and f'(x)*(h'(f(x))*(k'_2(g(f(x)),h(f(x)))*1)) >>>
+-- > (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
 --
 -- The possible duplication of becomes more severe as function composition grows deeper—
 -- a major performance issue in neural network applications.
@@ -2003,31 +2004,31 @@ import Numeric.InfBackprop.Utils.Tuple (cross)
 -- For further illustration, consider the first and second derivatives
 -- of the composition @(g . f)@:
 --
--- >>> simpleDerivative (g . f) x :: Traced SimpleExpr
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating (*) of g'(f(x)) and 1 >>>
---  <<< TRACING: Calculating (*) of f'(x) and g'(f(x))*1 >>>
--- f'(x)*(g'(f(x))*1)
+-- > >>> simpleDerivative (g . f) x :: Traced SimpleExpr
+-- >  <<< TRACING: Calculating f' of x >>>
+-- >  <<< TRACING: Calculating f of x >>>
+-- >  <<< TRACING: Calculating g' of f(x) >>>
+-- >  <<< TRACING: Calculating (*) of g'(f(x)) and 1 >>>
+-- >  <<< TRACING: Calculating (*) of f'(x) and g'(f(x))*1 >>>
+-- > f'(x)*(g'(f(x))*1)
 --
--- >>> simpleDerivative (simpleDerivative (g . f)) x :: Traced SimpleExpr
---  <<< TRACING: Calculating f'' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating (*) of g'(f(x)) and 1 >>>
---  <<< TRACING: Calculating (*) of g'(f(x))*1 and 1 >>>
---  <<< TRACING: Calculating (*) of f''(x) and (g'(f(x))*1)*1 >>>
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating g'' of f(x) >>>
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating (*) of f'(x) and 1 >>>
---  <<< TRACING: Calculating (*) of 1 and f'(x)*1 >>>
---  <<< TRACING: Calculating (*) of g''(f(x)) and 1*(f'(x)*1) >>>
---  <<< TRACING: Calculating (*) of f'(x) and g''(f(x))*(1*(f'(x)*1)) >>>
---  <<< TRACING: Calculating (+) of f'(x)*(g''(f(x))*(1*(f'(x)*1))) and 0 >>>
---  <<< TRACING: Calculating (+) of f''(x)*((g'(f(x))*1)*1) and (f'(x)*(g''(f(x))*(1*(f'(x)*1))))+0 >>>
--- (f''(x)*((g'(f(x))*1)*1))+((f'(x)*(g''(f(x))*(1*(f'(x)*1))))+0)
+-- > >>> simpleDerivative (simpleDerivative (g . f)) x :: Traced SimpleExpr
+-- >  <<< TRACING: Calculating f'' of x >>>
+-- >  <<< TRACING: Calculating f of x >>>
+-- >  <<< TRACING: Calculating g' of f(x) >>>
+-- >  <<< TRACING: Calculating (*) of g'(f(x)) and 1 >>>
+-- >  <<< TRACING: Calculating (*) of g'(f(x))*1 and 1 >>>
+-- >  <<< TRACING: Calculating (*) of f''(x) and (g'(f(x))*1)*1 >>>
+-- >  <<< TRACING: Calculating f' of x >>>
+-- >  <<< TRACING: Calculating g'' of f(x) >>>
+-- >  <<< TRACING: Calculating f' of x >>>
+-- >  <<< TRACING: Calculating (*) of f'(x) and 1 >>>
+-- >  <<< TRACING: Calculating (*) of 1 and f'(x)*1 >>>
+-- >  <<< TRACING: Calculating (*) of g''(f(x)) and 1*(f'(x)*1) >>>
+-- >  <<< TRACING: Calculating (*) of f'(x) and g''(f(x))*(1*(f'(x)*1)) >>>
+-- >  <<< TRACING: Calculating (+) of f'(x)*(g''(f(x))*(1*(f'(x)*1))) and 0 >>>
+-- >  <<< TRACING: Calculating (+) of f''(x)*((g'(f(x))*1)*1) and (f'(x)*(g''(f(x))*(1*(f'(x)*1))))+0 >>>
+-- > (f''(x)*((g'(f(x))*1)*1))+((f'(x)*(g''(f(x))*(1*(f'(x)*1))))+0)
 --
 -- Here we observe that @f'(x)@ is computed /twice/ in the second derivative.
 -- This occurs because it appears in two different branches of the expression tree:
@@ -2115,27 +2116,27 @@ import Numeric.InfBackprop.Utils.Tuple (cross)
 --
 -- >>> x = MkTraced $ variable "x" :: Traced SE
 --
--- >>> coshV2 x
---  <<< TRACING: Calculating exp of x >>>
---  <<< TRACING: Calculating negate of x >>>
---  <<< TRACING: Calculating exp of -(x) >>>
---  <<< TRACING: Calculating (+) of exp(x) and exp(-(x)) >>>
---  <<< TRACING: Calculating (/) of exp(x)+exp(-(x)) and 2 >>>
--- (exp(x)+exp(-(x)))/2
+-- > >>> coshV2 x
+-- >  <<< TRACING: Calculating exp of x >>>
+-- >  <<< TRACING: Calculating negate of x >>>
+-- >  <<< TRACING: Calculating exp of -(x) >>>
+-- >  <<< TRACING: Calculating (+) of exp(x) and exp(-(x)) >>>
+-- >  <<< TRACING: Calculating (/) of exp(x)+exp(-(x)) and 2 >>>
+-- > (exp(x)+exp(-(x)))/2
 --
 -- Now let's examine what happens when we compute both the value and derivative.
 -- To this end, we use a function `simpleValueAndDerivative`
 -- that computes both the value and derivative:
 --
--- >>> simpleValueAndDerivative coshV2 x :: (Traced SE, Traced SE)
--- ( <<< TRACING: Calculating exp of x >>>
---  <<< TRACING: Calculating negate of x >>>
---  <<< TRACING: Calculating exp of -(x) >>>
---  <<< TRACING: Calculating (+) of exp(x) and exp(-(x)) >>>
---  <<< TRACING: Calculating (/) of exp(x)+exp(-(x)) and 2 >>>
--- (exp(x)+exp(-(x)))/2, <<< TRACING: Calculating (-) of exp(x) and exp(-(x)) >>>
---  <<< TRACING: Calculating (*) of exp(x)-exp(-(x)) and 1 >>>
--- (exp(x)-exp(-(x)))*1)
+-- > >>> simpleValueAndDerivative coshV2 x :: (Traced SE, Traced SE)
+-- > ( <<< TRACING: Calculating exp of x >>>
+-- >  <<< TRACING: Calculating negate of x >>>
+-- >  <<< TRACING: Calculating exp of -(x) >>>
+-- >  <<< TRACING: Calculating (+) of exp(x) and exp(-(x)) >>>
+-- >  <<< TRACING: Calculating (/) of exp(x)+exp(-(x)) and 2 >>>
+-- > (exp(x)+exp(-(x)))/2, <<< TRACING: Calculating (-) of exp(x) and exp(-(x)) >>>
+-- >  <<< TRACING: Calculating (*) of exp(x)-exp(-(x)) and 1 >>>
+-- > (exp(x)-exp(-(x)))*1)
 --
 -- Notice how the exponential calculations (exp of x and exp of -(x)) appear only
 -- once in the trace, even though they're used in both the forward and backward passes.
@@ -2144,374 +2145,19 @@ import Numeric.InfBackprop.Utils.Tuple (cross)
 --
 -- Moreover, we can compute the second derivative without recomputing the exponentials:
 --
--- >>> simpleDerivative (simpleDerivative coshV2) x :: Traced SE
---  <<< TRACING: Calculating exp of x >>>
---  <<< TRACING: Calculating (*) of 1 and 1 >>>
---  <<< TRACING: Calculating (*) of exp(x) and 1*1 >>>
---  <<< TRACING: Calculating negate of x >>>
---  <<< TRACING: Calculating exp of -(x) >>>
---  <<< TRACING: Calculating negate of 1*1 >>>
---  <<< TRACING: Calculating (*) of exp(-(x)) and -(1*1) >>>
---  <<< TRACING: Calculating negate of exp(-(x))*-(1*1) >>>
---  <<< TRACING: Calculating (+) of exp(x)*(1*1) and -(exp(-(x))*-(1*1)) >>>
---  <<< TRACING: Calculating (+) of (exp(x)*(1*1))+-(exp(-(x))*-(1*1)) and 0 >>>
--- ((exp(x)*(1*1))+-(exp(-(x))*-(1*1)))+0
+-- > >>> simpleDerivative (simpleDerivative coshV2) x :: Traced SE
+-- >  <<< TRACING: Calculating exp of x >>>
+-- >  <<< TRACING: Calculating (*) of 1 and 1 >>>
+-- >  <<< TRACING: Calculating (*) of exp(x) and 1*1 >>>
+-- >  <<< TRACING: Calculating negate of x >>>
+-- >  <<< TRACING: Calculating exp of -(x) >>>
+-- >  <<< TRACING: Calculating negate of 1*1 >>>
+-- >  <<< TRACING: Calculating (*) of exp(-(x)) and -(1*1) >>>
+-- >  <<< TRACING: Calculating negate of exp(-(x))*-(1*1) >>>
+-- >  <<< TRACING: Calculating (+) of exp(x)*(1*1) and -(exp(-(x))*-(1*1)) >>>
+-- >  <<< TRACING: Calculating (+) of (exp(x)*(1*1))+-(exp(-(x))*-(1*1)) and 0 >>>
+-- > ((exp(x)*(1*1))+-(exp(-(x))*-(1*1)))+0
 
 -- $what-is-next
 --
 -- Unboxed vectors and tensors are not currently supported in the library.
-
---
---
---
--- In the previous section
--- [Fixed argument type](fixed-argument-type)
--- we considerd derivative operators that are polymorphic over the function value type
--- but not over the function argument type that is fixed for each particular operator.
--- This subsection is dedicated to thier conterparts
--- that are polymorphic over the function argument type
--- but not over the function value type that is fixed.
---
--- >>> :{
---   sphericToVec :: (TrigField a) => (a, a) -> BoxedVector 3 a
---   sphericToVec (theta, phi) =
---     DVGS.fromTuple (sin theta * cos phi, sin theta * sin phi, cos theta)
--- :}
---
--- >>> :{
---   sphericToVec' :: (TrigField a, ExpField a, a ~ CT a) =>
---     (a, a) -> BoxedVector 3 (a, a)
---   sphericToVec' = tupleArgDerivative sphericToVec
--- :}
---
--- >>> :{
---   x = variable "x"
---   y = variable "y"
--- :}
---
--- >>> simplify $ sphericToVec' (x, y) :: BoxedVector 3 (SE, SE)
--- Vector [(cos(x)*cos(y),-(sin(y)*sin(x))),(cos(x)*sin(y),cos(y)*sin(x)),(-(sin(x)),0)]
---
---
---
--- Operators like 'twoArgsDerivative', 'tupleArgDerivative',
--- 'BoxedVectorDerivative', 'streamDerivative', and other similar operators
--- considered in the previous sections
--- are polymorphic over the function value type but not function argument type.
--- They are convenient for taking high-order derivatives.
--- It is because the function argument type is kept unchange during the differentiation
--- while the function value type is modified,
--- see [Derivatives of function of tuples](#g:derivatives-of-function-of-tuples).
---
---
--- Custom argument derivative
---
---
---
-
--- In section [Complex argument function](#g:gradient),
--- we have considered the operator 'scalarValDerivative',
--- that is polymorpfic over the argument type, but aplicable only
--- for scalar values funciton.
--- In contrast, the operator 'derivative' from section
--- [Complex value function](#g:multivalued-function)
--- is polymorphic over the value type,
--- but aplicable only for a function of a single argument.
--- In this subsection, we consider a modification of 'derivative'
--- that is able to differentiate function over tuple and other fixed
--- types of arguments and in the same time polymorphic over the value type.
--- These functions are, in particular, convinient if we need to work with
--- Hessians and higher order derivatives.
-
--- In order have this feature for sure without counting on GHC we modify the type
--- @Diff@ from
---
--- >>> data DiffNoCache t a = MkDiffNoCache {valueNoCache :: a, backpropNoCache :: CT a -> CT t}
---
--- to
---
--- >>> data DiffCache t a = forall h. MkDiffCache {valueCache :: a, backpropCache :: h -> CT a -> CT t, cache :: h}
---
--- We add the field @cache :: h@ into @Diff@ of existential type @h@ that is dedicated to store the intermediate
--- results of forward step for possible usage on the backward step.
--- The second modification of $Diff$ is the replacement of
--- @backprop :: CT a -> CT t@ by @backpropCache :: h -> CT a -> CT t@.
--- This is the function that takes the cache and the derivative of the output value
--- and returns the derivative of the input value.
---
--- >>> :{
---    f, g, h :: SymbolicFunc a => a -> a
---    f = unarySymbolicFunc "f"
---    g = unarySymbolicFunc "g"
---    h = unarySymbolicFunc "h"
---    k :: BinarySymbolicFunc a => a -> a -> a
---    k = binarySymbolicFunc "k"
---    xVar = MkTraced $ variable "x"
---    subexpF :: (SymbolicFunc a) => a -> (a, a)
---    subexpF x = (g y, h y) where y = f x
---    subexpK :: (SymbolicFunc a, BinarySymbolicFunc a, Additive a) => a -> a
---    subexpK x = k (g y) (h y) where y = f x
---    subexpK2 :: (SymbolicFunc a, BinarySymbolicFunc a, Additive a) => a -> a
---    subexpK2 x = k (g (f x)) (h (f x))
--- :}
---
--- >>> simplify $ (derivative subexpF) xVar :: (TracedSimpleExpr, TracedSimpleExpr)
--- ( <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
--- f'(x)*g'(f(x)), <<< TRACING: Calculating h' of f(x) >>>
--- f'(x)*h'(f(x)))
---
--- -- >>> simplify $ (derivative subexpK) xVar :: TracedSimpleExpr
---
--- >>> :{
---   v :: SymbolicFunc a => a -> DVGS.Vector DV.Vector 3 a
---   v t = DVGS.fromTuple (unarySymbolicFunc "v_x" t, unarySymbolicFunc "v_y" t, unarySymbolicFunc "v_z" t)
--- :}
---
--- -- >>> (derivative (v . f)) xVar :: DVGS.Vector DV.Vector 3 TracedSimpleExpr
---
--- -- >>> backprop (subexpK (initDiff xVar)) (MkTraced $ number 1)
---
--- To illustrate the idea we consider the following example.
--- Let we would like to define a differentiable hyperbolic cosine function
--- \[ ch x = \frac{\e^x + \e^{-x}}{2} \]
--- and its derivative
--- \[ sh x = \frac{\e^x - \e^{-x}}{2} \]
--- such that the values of \[e^x\] and \[e^{-x}\] are reused on the backward step.
---
--- The implementation can be
---
--- >>> expTrace x = trace (" <<< TRACING: Calculating exp of " <> show x <> " >>>") (exp x)
---
--- >>> :{
---    chNoCache :: DiffNoCache Float Float -> DiffNoCache Float Float
---    chNoCache MkDiffNoCache {valueNoCache = x, backpropNoCache = backpropX} =
---      MkDiffNoCache {
---          valueNoCache = ePlus + eMinus,
---          backpropNoCache = \cy -> backpropX ((ePlus - eMinus) * cy)
---        } where
---          ePlus = expTrace $ x / 2
---          eMinus = expTrace $ -x / 2
--- :}
---
--- >>> :{
---    chCache :: DiffCache Float Float -> DiffCache Float Float
---    chCache MkDiffCache {valueCache = x, backpropCache = backpropX, cache = h} =
---      MkDiffCache {
---          valueCache = ePlus + eMinus,
---          backpropCache = \(ePlus_, eMinus_, h_) cy -> backpropX h_ ((ePlus - eMinus) * cy),
---          cache = (ePlus, eMinus, h)
---        } where
---        ePlus = expTrace $ x / 2
---        eMinus = expTrace $ -x / 2
--- :}
---
--- >>> :{
---    squareNoCache :: DiffNoCache Float Float -> DiffNoCache Float Float
---    squareNoCache MkDiffNoCache {valueNoCache = x, backpropNoCache = backpropX}
---      = MkDiffNoCache {valueNoCache = x * x, backpropNoCache = \cy -> backpropX (2 * x * cy)}
--- :}
---
--- >>> :{
---    squareCache :: DiffCache Float Float -> DiffCache Float Float
---    squareCache MkDiffCache {valueCache = x, backpropCache = backpropX, cache = h}
---      = MkDiffCache {valueCache = x * x, backpropCache = \h_ cy -> backpropX h_ (2 * x * cy), cache = h}
--- :}
---
--- >>> endBackpropNoCache x = MkDiffNoCache x id
--- >>> endBackpropCache x = MkDiffCache x (const id) ()
---
--- >>> derivativeCache f x = temp (f x) where temp (MkDiffCache _ bp h) = bp h 1
---
---
--- >>> backpropNoCache ((squareNoCache . chNoCache) (endBackpropNoCache 2)) 1
---  <<< TRACING: Calculating exp of 1.0 >>>
---  <<< TRACING: Calculating exp of -1.0 >>>
--- 14.507441
---
--- >>> derivativeCache (squareCache . chCache) (endBackpropCache 2)
---  <<< TRACING: Calculating exp of 1.0 >>>
---  <<< TRACING: Calculating exp of -1.0 >>>
--- 14.507441
---
--- We can see that we must accumulate the caches from each of the stages of the forward step into a kind of stack
--- and take back the values from the stack on the backward step.
---
--- We will demonstrate now how it works for simbolic functions
---
---
---
---
--- we can use the 'trace' function from
---
---
---
--- >>> h(g(f xVar)) :: Traced SimpleExpr
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of g(f(x)) >>>
--- h(g(f(x)))
---
--- >>> value (subexpK (initDiff xVar))
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
--- k(g(f(x)),h(f(x)))
---
---
--- >>> simplify $ derivative (h . g . f) xVar :: Traced SimpleExpr
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h' of g(f(x)) >>>
--- f'(x)*(g'(f(x))*h'(g(f(x))))
---
---
---
--- >>> simplify $ subexpF xVar :: (Traced SimpleExpr, Traced SimpleExpr)
--- ( <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g of f(x) >>>
--- g(f(x)), <<< TRACING: Calculating h of f(x) >>>
--- h(f(x)))
---
--- >>> simplify $ subexpK xVar :: Traced SimpleExpr
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k of g(f(x)) and h(f(x)) >>>
--- k(g(f(x)),h(f(x)))
---
---
--- >>> simplify $ derivative subexpK xVar :: Traced SimpleExpr
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
---  <<< TRACING: Calculating h' of f(x) >>>
---  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
--- (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
---
--- >>> simplify $ derivative subexpK2 xVar :: Traced SimpleExpr
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating h' of f(x) >>>
---  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
--- (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
---
--- -- >>> simplify $ (derivative (derivative subexpK)) xVar :: Traced SimpleExpr
---  <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
---  <<< TRACING: Calculating g of f(x) >>>
---  <<< TRACING: Calculating h of f(x) >>>
---  <<< TRACING: Calculating k'_1 of g(f(x)) and h(f(x)) >>>
---  <<< TRACING: Calculating h' of f(x) >>>
---  <<< TRACING: Calculating k'_2 of g(f(x)) and h(f(x)) >>>
--- (f'(x)*(g'(f(x))*k'_1(g(f(x)),h(f(x)))))+(f'(x)*(h'(f(x))*k'_2(g(f(x)),h(f(x)))))
---
--- >>> simplify $ derivative subexpF xVar :: (Traced SimpleExpr, Traced SimpleExpr)
--- ( <<< TRACING: Calculating f' of x >>>
---  <<< TRACING: Calculating f of x >>>
---  <<< TRACING: Calculating g' of f(x) >>>
--- f'(x)*g'(f(x)), <<< TRACING: Calculating h' of f(x) >>>
--- f'(x)*h'(f(x)))
---
---
---
---
--- >>> -- logF :: (SymbolicFunc a) => a -> a
--- >>> -- logF x = log (intPow 2 (f x))
--- >>> -- simplify $ derivative logF xVar :: SimpleExpr
---
---
-
--- -- $how-it-works-non-differentiability
---
--- ==== 1
---
--- The control of the differentiablity of functions is on the client side.
--- For example, it is straightforward to define a non-differentiable function such as:
---
--- >>> import GHC.Base (Ord((>)))
--- >>> import GHC.Num (Num)
--- >>> import Numeric.InfBackprop.Utils.Sum (HasSum(sum), HasSum')
---
--- >>> :{
---  f :: (Ord a, Additive a, GHC.Num.Num a) => a -> a
---  f x = if x > zero then x else -x
---  f' :: (Ord a, Ring a, GHC.Num.Num a, CT a ~ a) => a -> a
---  f' = simpleDerivative f
---  f'' :: (Ord a, Ring a, GHC.Num.Num a, CT a ~ a) => a -> a
---  f'' = simpleDerivative f'
--- :}
---
--- >>> fmap f' [-3, -2, -1, 0, 1, 2, 3] :: [Float]
--- [-1.0,-1.0,-1.0,-1.0,1.0,1.0,1.0]
---
--- >>> fmap f'' [-3, -2, -1, 0, 1, 2, 3] :: [Float]
--- [-0.0,-0.0,-0.0,-0.0,0.0,0.0,0.0]
---
--- The problem of non-differentiability as \(0\)
--- is ignored by the present package.
---
--- ==== 2
--- A less trivial example is the total sum of finite support stream
--- (see `Data.Vector.FiniteSupportStream`):
---
--- >>> import Debug.SimpleExpr (variable, SE, simplify)
--- >>> import Data.FiniteSupportStream (fromTuple, toVector, finiteSupportStreamSum)
--- >>> import Numeric.InfBackprop (customArgDerivative, finiteSupportStreamArg)
---
--- >>> :{
---   f :: Additive a => FiniteSupportStream a -> a
---   f = finiteSupportStreamSum
--- :}
---
--- >>> f (fromTuple (1 :: Int, 2 :: Int, 3 :: Int))
--- 6
---
--- >>> :{
---  f' :: (Distributive a, CT a ~ a) => FiniteSupportStream a -> Stream a
---  f' = customArgDerivative finiteSupportStreamArg f
--- :}
---
--- ==== 2
---
--- >>> :{
---  finiteSupportStreamSumV1 :: Additive a => FiniteSupportStream a -> a
---  finiteSupportStreamSumV1 = sum . toVector
--- :}
---
--- >>> :{
---  finiteSupportStreamSumV1' :: forall a. (Distributive a, CT a ~ a) =>
---    FiniteSupportStream a -> Stream (CT a)
---  finiteSupportStreamSumV1' = finiteSupportStreamArgDerivative finiteSupportStreamSumV1
--- :}
---
--- >>> finiteSupportStreamSumV1'$ unsafeFromList [0, 1, 2, 3, 0]
---
---
--- >>> :{
---  finiteSupportStreamSumV2 :: Additive a => FiniteSupportStream a -> a
---  finiteSupportStreamSumV2 = sum
--- :}
---
--- >>> :{
---  finiteSupportStreamSumV2' :: (Distributive a, CT a ~ a) =>
---    FiniteSupportStream a -> Stream (CT a)
---  finiteSupportStreamSumV2' = simpleDerivative sum
--- :}
---
---
---

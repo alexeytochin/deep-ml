@@ -18,9 +18,9 @@ description:    This is a minimalistic toolkit for simple mathematical expressio
                 .
                  Besides an expression visualization feature is also provided. 
                 .
-                 ![image description](doc/images/imaginary_expr_sum.png) 
+                 ![image description](docs/doc/images/imaginary_expr_sum.png) 
                 .
-                 See [tutorial](Debug-SimpleExpr-Tutorial.html) for details.
+                 See [tutorial](docs/Debug-SimpleExpr-Tutorial.html) for details.
 category:       Mathematics
 author:         Alexey Tochin
 maintainer:     Alexey.Tochin@gmail.com
@@ -30,6 +30,10 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     CHANGELOG.md
+    doc/images/composition.png
+    doc/images/demo1.png
+    doc/images/demo2.png
+    doc/images/imaginary_expr_sum.png
 extra-doc-files:
     doc/images/composition.png
     doc/images/demo1.png
@@ -63,7 +67,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       Stream <0.5
-    , base >=4.7 && <5
+    , base >=4.19 && <5
     , combinatorial <0.2
     , composition <1.1
     , data-fix <0.4
@@ -86,22 +90,22 @@ test-suite doctests
       Paths_simple_expr
   hs-source-dirs:
       doctests
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -ddump-tc-trace -dppr-debug
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Stream
-    , base >=4.7 && <5
+      Stream <0.5
+    , base >=4.19 && <5
     , combinatorial
     , composition
-    , data-fix
+    , data-fix <0.4
     , doctest
-    , graphite
-    , graphviz
-    , hashable
+    , graphite <0.11
+    , graphviz <2999.21
+    , hashable <1.6
     , mtl
-    , numhask
-    , text
-    , unicode-show
+    , numhask <0.14
+    , text <2.2
+    , unicode-show <0.2
     , unordered-containers
-    , vector
-    , vector-sized
+    , vector <0.14
+    , vector-sized <1.7
   default-language: Haskell2010

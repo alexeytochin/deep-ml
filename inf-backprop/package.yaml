@@ -6,12 +6,13 @@ maintainer: Alexey.Tochin@gmail.com
 copyright: 2023-2025 Alexey Tochin
 extra-source-files:
 - CHANGELOG.md
+- doc/images/*.png
 extra-doc-files:
 - doc/images/*.png
 synopsis: Automatic differentiation and backpropagation.
 category: Mathematics
 description:
-  "![Second order derivative of a composition](doc/images/composition_second_derivative.png)
+  "![Second order derivative of a composition](docs/doc/images/composition_second_derivative.png)
   \n\n
   Automatic differentiation library with efficient reverse-mode backpropagation for Haskell.
   \n\n
@@ -19,9 +20,14 @@ description:
   designed for building strongly typed deep learning frameworks.
   It offers:
   \n\n
-  * Reverse-mode automatic differentiation (backpropagation)\n* Support for higher-order derivatives
+  * Reverse-mode automatic differentiation (backpropagation)
   \n\n
-  * Type-safe gradient computation\n* Integration with NumHask for polymorphic numeric operations\n
+  * Support for higher-order derivatives
+  \n\n
+  * Type-safe gradient computation
+  \n\n
+  * Integration with 
+  [numhask](https://hackage.haskell.org/package/numhask)
   \n\n
   * Flexible representations including profunctor and Van Laarhoven encodings
   \n\n
@@ -29,7 +35,8 @@ description:
   making it suitable\nfor research, prototyping neural networks, 
   and implementing custom\ndifferentiable algorithms.
   \n\n
-  See the [tutorial](Numeric-InfBackprop-Tutorial.html)
+  See the 
+  [tutorial](docs/Numeric-InfBackprop-Tutorial.html)
   for detailed\nexamples and usage patterns.
   \n\n
   Similar Projects:
@@ -131,8 +138,6 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -ddump-tc-trace
-    - -dppr-debug
     dependencies:
     - doctest
     - simple-expr >= 0.2 && < 0.3
