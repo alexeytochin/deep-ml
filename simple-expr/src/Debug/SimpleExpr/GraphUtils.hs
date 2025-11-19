@@ -33,7 +33,7 @@ simpleExprToGraph :: SimpleExpr -> DGraph String ()
 simpleExprToGraph (Fix e) = case e of
   NumberF n -> appendNodeToGraph (show n) [] graph
   VariableF c -> appendNodeToGraph c [] graph
-  BinaryFuncF _ a b -> appendNodeToGraph (show (Fix e)) [show a, show b] graph
+  --  BinaryFuncF _ a b -> appendNodeToGraph (show (Fix e)) [show a, show b] graph
   SymbolicFuncF _ args' -> appendNodeToGraph (show (Fix e)) (fmap show args') graph
   where
     graph = exprToGraph $ dependencies (Fix e)
@@ -64,7 +64,7 @@ appendNodeToGraph newNodeName depNodeNames graph = foldr addArc initGraph depNod
 -- We expect something like
 -- @fromList [("y",[("x-y",()),("x+y",())]),("x-y",[]),("x",[("x-y",()),("x+y",())]),("x+y",[])]@
 -- depending on the packages version version.
-exprToGraph :: Expr d => d -> DGraph String ()
+exprToGraph :: (Expr d) => d -> DGraph String ()
 exprToGraph d = case content d of
   [] -> empty -- insertVertex (name e) empty
   [v] -> simpleExprToGraph v
@@ -88,5 +88,5 @@ exprToGraph d = case content d of
 -- @>>> plotExpr [x + y, x - y]@
 --
 -- ![x+y,x-y](doc/images/demo2.png)
-plotExpr :: Expr d => d -> IO ThreadId
+plotExpr :: (Expr d) => d -> IO ThreadId
 plotExpr = plotDGraph . exprToGraph

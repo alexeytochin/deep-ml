@@ -1,76 +1,143 @@
-name:                inf-backprop
-version:             0.1.1.0
-license:             BSD3
-author:              "Alexey Tochin"
-maintainer:          "Alexey.Tochin@gmail.com"
-copyright:           "2023 Alexey Tochin"
-
+name: inf-backprop
+version: 0.2.0.0
+license: BSD3
+author: Alexey Tochin
+maintainer: Alexey.Tochin@gmail.com
+copyright: 2023-2025 Alexey Tochin
 extra-source-files:
-  - CHANGELOG.md
-
+- CHANGELOG.md
+- doc/images/*.png
 extra-doc-files:
-  - doc/images/*.png
-
-synopsis:            Automatic differentiation and backpropagation.
-category:            Mathematics
-
-description: |
-  ![Second order derivative of a composition](docs/doc/images/composition_second_derivative.png)
-
-  Automatic differentiation and backpropagation.
-  We do not attract gradient tape.
-  Instead, the differentiation operator is defined directly as a map between differentiable function objects.
-  Such functions are to be combined in arrow style using '(>>>)', '(***)', 'first', etc.
-  
-  The original purpose of the package is an automatic backpropagation differentiation component
-  for a functional type-dependent library for deep machine learning.
-  See [tutorial](docs/InfBackprop-Tutorial.html) details.
-  
+- doc/images/*.png
+synopsis: Automatic differentiation and backpropagation.
+category: Mathematics
+description:
+  "![Second order derivative of a composition](docs/doc/images/composition_second_derivative.png)
+  \n\n
+  Automatic differentiation library with efficient reverse-mode backpropagation for Haskell.
+  \n\n
+  This package provides a general-purpose automatic differentiation system 
+  designed for building strongly typed deep learning frameworks.
+  It offers:
+  \n\n
+  * Reverse-mode automatic differentiation (backpropagation)
+  \n\n
+  * Support for higher-order derivatives
+  \n\n
+  * Type-safe gradient computation
+  \n\n
+  * Integration with 
+  [numhask](https://hackage.haskell.org/package/numhask)
+  \n\n
+  * Flexible representations including profunctor and Van Laarhoven encodings
+  \n\n
+  The library emphasizes composability and type safety, 
+  making it suitable\nfor research, prototyping neural networks, 
+  and implementing custom\ndifferentiable algorithms.
+  \n\n
+  See the 
+  [tutorial](docs/Numeric-InfBackprop-Tutorial.html)
+  for detailed\nexamples and usage patterns.
+  \n\n
+  Similar Projects:
+  \n\n
+  * [ad](https://hackage.haskell.org/package/ad) 
+  - Comprehensive automatic differentiation library supporting forward and reverse modes
+  \n\n
+  * [backprop](https://hackage.haskell.org/package/backprop) - 
+  Heterogeneous automatic differentiation with emphasis on ease of use"
 dependencies:
-  - base >= 4.7 && < 5
-  - numhask
-  - isomorphism-class
-  - monad-logger
-  - text
-  - transformers
-  - comonad
-  - simple-expr
-
+- base >= 4.7 && < 5
+- numhask
+- isomorphism-class
+- text
+- transformers
+- comonad
+- simple-expr < 0.3
+- profunctors
+- optics
+- lens
+- finite-typelits
+- vector
+- vector-sized
+- fixed-vector
+- primitive
+- Stream
+- deepseq
+- ghc-prim
+- data-fix
+- safe
+- extra
+- unordered-containers
+- composition
+- hashable
+- indexed-list-literals
+- combinatorial
 ghc-options:
-  - -Wall
-  - -Wcompat
-  - -Widentities
-  - -Wincomplete-record-updates
-  - -Wincomplete-uni-patterns
-  - -Wmissing-export-lists
-  - -Wmissing-home-modules
-  - -Wpartial-fields
-  - -Wredundant-constraints
-
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
 library:
-  source-dirs: src
+  source-dirs:
+  - src
   default-extensions:
-    - NoImplicitPrelude
-    - GADTs
-    - TypeFamilies
-    - MultiParamTypeClasses
-    - FlexibleInstances
-    - ScopedTypeVariables
-    - ConstraintKinds
-    - RankNTypes
-    - InstanceSigs
-    - TupleSections
-    - FlexibleContexts
-    - DeriveFunctor
-
+  - NoImplicitPrelude
+  - GADTs
+  - TypeFamilies
+  - MultiParamTypeClasses
+  - FlexibleInstances
+  - ScopedTypeVariables
+  - ConstraintKinds
+  - RankNTypes
+  - InstanceSigs
+  - TupleSections
+  - FlexibleContexts
+  - DeriveFunctor
+  - TypeOperators
+  - TypeApplications
+  - BangPatterns
+  - DataKinds
+  - PatternSynonyms
+  dependencies:
+  - Stream < 0.5
+  - ghc-prim < 0.13
+  - deepseq < 1.6
+  - transformers < 0.7
+  - combinatorial < 0.2
+  - comonad < 5.1
+  - composition < 1.1
+  - data-fix < 0.4
+  - hashable < 1.6
+  - text < 2.2
+  - extra < 1.9
+  - finite-typelits < 0.3
+  - fixed-vector < 2.1
+  - primitive < 0.10
+  - indexed-list-literals < 0.3
+  - isomorphism-class < 0.4
+  - profunctors < 5.7
+  - unordered-containers < 0.3
+  - vector < 0.14
+  - lens < 5.4
+  - numhask < 0.14
+  - optics < 0.5
+  - safe < 0.4
+  - vector-sized < 1.7
 tests:
   doctests:
-    source-dirs:        doctests
-    main:               Main.hs
+    source-dirs: doctests
+    main: Main.hs
     ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
+    - -w
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
     dependencies:
-      - simple-expr
-      - doctest
+    - doctest
+    - simple-expr >= 0.2 && < 0.3

@@ -1,80 +1,112 @@
-name:                simple-expr
-version:             0.1.1.0
-license:             BSD3
-author:              "Alexey Tochin"
-maintainer:          "Alexey.Tochin@gmail.com"
-copyright:           "2023 Alexey Tochin"
-
+name: simple-expr
+version: 0.2.0.0
+license: BSD3
+author: Alexey Tochin
+maintainer: Alexey.Tochin@gmail.com
+copyright: 2024 Alexey Tochin
 extra-source-files:
-  - CHANGELOG.md
-
+- CHANGELOG.md
+- doc/images/*.png
+- main_page_images/*.png
 extra-doc-files:
-  - doc/images/*.png
-
-synopsis:            Minimalistic toolkit for simple mathematical expression.
-category:            Mathematics
-
-description: |
-  This is a minimalistic toolkit for simple mathematical expression developed for debug purposes similar to
-  'simple-reflect' package
-  but based on slightly different principles.
+- doc/images/*.png
+- main_page_images/*.png
+synopsis: Minimalistic toolkit for simple mathematical expression.
+category: Mathematics
+description:
+  "This is a minimalistic toolkit for simple mathematical expression 
+  developed for debug purposes similar to 
+  [simple-reflect](https://hackage.haskell.org/package/simple-reflect) 
+  package but based on slightly different principles.
   In particular, we use ordinary syntactic trees instead of turning them into strings.
+  \n\n
   There is a primitive manipulation capability like
-
+  \n\n
   @
+    \n  
     >>> simplify $ (x + 0) * 1 - x * (3 - 2)
+    \n  
     0
+    \n
   @
-
+  \n\n
   Besides an expression visualization feature is also provided.
-
+  \n\n
   ![image description](docs/doc/images/imaginary_expr_sum.png)
-  
-  See [tutorial](docs/Debug-SimpleExpr-Tutorial.html) for details.
-
+  \n\n
+  See 
+  [tutorial](docs/Debug-SimpleExpr-Tutorial.html) 
+  for details."
 dependencies:
-  - base >= 4.7 && < 5
-  - text
-  - numhask
-  - graphviz
-  - graphite
-  - hashable
-  - unicode-show
-  - data-fix
-
+- base >= 4.19 && < 5
+- text
+- numhask
+- graphviz
+- graphite
+- hashable
+- unicode-show
+- data-fix
+- Stream
+- vector
+- vector-sized
+- mtl
+- unordered-containers
+- composition
+- combinatorial
 ghc-options:
-  - -Wall
-  - -Wcompat
-  - -Widentities
-  - -Wincomplete-record-updates
-  - -Wincomplete-uni-patterns
-  - -Wmissing-export-lists
-  - -Wmissing-home-modules
-  - -Wpartial-fields
-  - -Wredundant-constraints
-
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
 library:
   source-dirs: src
   default-extensions:
-    - NoImplicitPrelude
-    - InstanceSigs
-    - DeriveFunctor
-    - MultiParamTypeClasses
-    - FlexibleInstances
-    - RankNTypes
-    - FlexibleContexts
-    - ScopedTypeVariables
-    - ConstraintKinds
-
+  - NoImplicitPrelude
+  - InstanceSigs
+  - DeriveFunctor
+  - MultiParamTypeClasses
+  - FlexibleInstances
+  - RankNTypes
+  - FlexibleContexts
+  - ScopedTypeVariables
+  - ConstraintKinds
+  dependencies:
+  - Stream < 0.5
+  - mtl < 2.4
+  - combinatorial < 0.2
+  - composition < 1.1
+  - data-fix < 0.4
+  - hashable < 1.6
+  - text < 2.2
+  - graphite < 0.11
+  - unordered-containers < 0.3
+  - vector < 0.14
+  - graphviz < 2999.21
+  - numhask < 0.14
+  - unicode-show < 0.2
+  - vector-sized < 1.7
 tests:
   doctests:
-    source-dirs:        doctests
-    main:               Main.hs
+    source-dirs: doctests
+    main: Main.hs
     ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
     dependencies:
-      - simple-expr
-      - doctest
-
+    - doctest
+    - Stream < 0.5
+    - data-fix < 0.4
+    - graphite < 0.11
+    - graphviz < 2999.21
+    - hashable < 1.6
+    - numhask < 0.14
+    - text < 2.2
+    - unicode-show < 0.2
+    - vector < 0.14
+    - vector-sized < 1.7

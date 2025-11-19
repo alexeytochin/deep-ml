@@ -1,5 +1,8 @@
-resolver: lts-23.0
+resolver: lts-24.19
 
 packages:
   - inf-backprop
   - simple-expr
+
+ghc-options:
+  "$locals": -fwrite-ide-info

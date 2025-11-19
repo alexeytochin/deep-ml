@@ -6,7 +6,9 @@
 -- License     :  BSD3 (see the file LICENSE)
 -- Maintainer  :  Alexey Tochin <Alexey.Tochin@gmail.com>
 --
--- Copies of some methods from @graphite@ package with only purpose
+-- Copies of some methods from
+-- [graphite](https://hackage.haskell.org/package/graphite)
+-- package with only purpose
 -- to replace the parameter 'Sfdp' by 'Dot' in 'plotDGraph' term.
 module Data.Graph.VisualizeAlternative (plotDGraph, plotDGraphPng, toDirectedDot, sensibleDotParams) where
 
