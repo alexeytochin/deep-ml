@@ -18,20 +18,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Stack
-        run: |
-          curl -sSL https://get.haskellstack.org/ | sh
+      - name: Upgrade Stack
+        run: stack upgrade
 
-      - name: Ensure latest Hpack
-        run: |
-          stack install hpack
-        env:
-          STACK_ROOT: ~/.stack
+      - name: Set up Stack with LTS Snapshot
+        run: stack --resolver nightly setup
 
-      - name: Build with latest nightly
-        run: |
-          stack --resolver nightly setup
-          stack --resolver nightly build --test --no-run-benchmarks
+      - name: Install Dependencies
+        run: stack --resolver nightly build --only-dependencies
+
+      - name: Build All Packages
+        run: stack --resolver nightly build --fast --test --no-run-benchmarks
 
       - name: Check outdated dependencies for all packages
         run: |
