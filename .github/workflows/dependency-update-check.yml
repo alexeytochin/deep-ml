@@ -15,16 +15,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Stack
-        uses: actions/setup-haskell@v1
-        with:
-          ghc-version: "latest"
+      - name: Install Stack
+        run: |
+          curl -sSL https://get.haskellstack.org/ | sh
 
-      - name: Install dependencies with Stack
-        run: stack setup && stack build --dependencies-only
+      - name: Ensure latest Hpack
+        run: |
+          stack install hpack
+        env:
+          STACK_ROOT: ~/.stack
+
+      - name: Build with latest nightly
+        run: |
+          stack --resolver nightly setup
+          stack --resolver nightly build --test --no-run-benchmarks
 
       - name: Check outdated dependencies for all packages
         run: |
@@ -34,6 +41,3 @@ jobs:
           cd inf-backprop
           cabal outdated
           cd ..
-
-      - name: Build all packages
-        run: stack build
