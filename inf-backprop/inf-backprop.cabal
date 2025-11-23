@@ -1,13 +1,13 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
 name:           inf-backprop
-version:        0.2.0.0
+version:        0.2.0.2
 synopsis:       Automatic differentiation and backpropagation.
-description:    ![Second order derivative of a composition](docs/doc/images/composition_second_derivative.png) 
+description:    ![Second order derivative of a composition](https://raw.githubusercontent.com/alexeytochin/deep-ml/refs/heads/main/inf-backprop/doc/images/composition_second_derivative.png) 
                 .
                  Automatic differentiation library with efficient reverse-mode backpropagation for Haskell. 
                 .
@@ -21,13 +21,11 @@ description:    ![Second order derivative of a composition](docs/doc/images/comp
                 .
                  * Integration with [numhask](https://hackage.haskell.org/package/numhask) 
                 .
-                 * Flexible representations including profunctor and Van Laarhoven encodings 
-                .
                  The library emphasizes composability and type safety, making it suitable
                 for research, prototyping neural networks, and implementing custom
                 differentiable algorithms. 
                 .
-                 See the [tutorial](docs/Numeric-InfBackprop-Tutorial.html) for detailed
+                 See the [tutorial](https://hackage-content.haskell.org/package/inf-backprop/docs/Numeric-InfBackprop-Tutorial.html) for detailed
                 examples and usage patterns. 
                 .
                  Similar Projects: 
@@ -42,6 +40,9 @@ copyright:      2023-2025 Alexey Tochin
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+tested-with:
+    GHC == 9.8.4
+  , GHC == 9.10.3
 extra-source-files:
     CHANGELOG.md
     doc/images/backprop.drawio.png
@@ -115,7 +116,7 @@ library
     , primitive <0.10
     , profunctors <5.7
     , safe <0.4
-    , simple-expr <0.3
+    , simple-expr ==0.2.*
     , text <2.2
     , transformers <0.7
     , unordered-containers <0.3

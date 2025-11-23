@@ -1,5 +1,8 @@
 # Revision history for inf-backprop
 
+## [0.2.0.2] -- 2025-11-23
+* **Documentation fixes**
+
 ## [0.2.0.1] -- 2025-11-23
 * **Dependency upper bounds**
 * **Documentation fixes**
