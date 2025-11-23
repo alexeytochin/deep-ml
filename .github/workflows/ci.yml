@@ -12,14 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        resolver:
-          - lts-23.0
-          - lts-23.7
-          - lts-24.19
-          - ghc-9.4.8
-          - ghc-9.6.5
-          - ghc-9.8.2
-          - ghc-9.10.1
+        - lts-23.0 # GHC 9.8.4
+        - lts-23.7 # GHC 9.8.4
+        - lts-24.19 # GHC 9.10.3
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
