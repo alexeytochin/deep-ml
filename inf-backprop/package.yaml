@@ -106,7 +106,7 @@ library:
   - PatternSynonyms
   dependencies:
   - Stream < 0.5
-  - ghc-prim < 0.13
+  - ghc-prim < 0.14
   - deepseq < 1.6
   - transformers < 0.7
   - combinatorial < 0.2

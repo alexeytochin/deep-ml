@@ -11,8 +11,7 @@ description:    ![Second order derivative of a composition](docs/doc/images/comp
                 .
                  Automatic differentiation library with efficient reverse-mode backpropagation for Haskell. 
                 .
-                 This package provides a general-purpose automatic differentiation system designed
-                 for building strongly typed deep learning frameworks. It offers:
+                 This package provides a general-purpose automatic differentiation system designed for building strongly typed deep learning frameworks. It offers: 
                 .
                  * Reverse-mode automatic differentiation (backpropagation) 
                 .
@@ -106,7 +105,7 @@ library
     , extra <1.9
     , finite-typelits <0.3
     , fixed-vector <2.1
-    , ghc-prim <0.13
+    , ghc-prim <0.14
     , hashable <1.6
     , indexed-list-literals <0.3
     , isomorphism-class <0.4
