@@ -24,7 +24,7 @@ description:    This is a minimalistic toolkit for simple mathematical expressio
 category:       Mathematics
 author:         Alexey Tochin
 maintainer:     Alexey.Tochin@gmail.com
-copyright:      2024 Alexey Tochin
+copyright:      2023-2025 Alexey Tochin
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple

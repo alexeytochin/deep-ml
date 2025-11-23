@@ -1,5 +1,5 @@
 name: inf-backprop
-version: 0.2.0.0
+version: 0.2.0.1
 license: BSD3
 author: Alexey Tochin
 maintainer: Alexey.Tochin@gmail.com
@@ -12,7 +12,7 @@ extra-doc-files:
 synopsis: Automatic differentiation and backpropagation.
 category: Mathematics
 description:
-  "![Second order derivative of a composition](docs/doc/images/composition_second_derivative.png)
+  "![Second order derivative of a composition](https://raw.githubusercontent.com/alexeytochin/deep-ml/refs/heads/main/inf-backprop/doc/images/composition_second_derivative.png)
   \n\n
   Automatic differentiation library with efficient reverse-mode backpropagation for Haskell.
   \n\n
@@ -29,14 +29,12 @@ description:
   * Integration with 
   [numhask](https://hackage.haskell.org/package/numhask)
   \n\n
-  * Flexible representations including profunctor and Van Laarhoven encodings
-  \n\n
   The library emphasizes composability and type safety, 
   making it suitable\nfor research, prototyping neural networks, 
   and implementing custom\ndifferentiable algorithms.
   \n\n
   See the 
-  [tutorial](docs/Numeric-InfBackprop-Tutorial.html)
+  [tutorial](https://hackage-content.haskell.org/package/inf-backprop-0.2.0.1/docs/Numeric-InfBackprop-Tutorial.html)
   for detailed\nexamples and usage patterns.
   \n\n
   Similar Projects:
@@ -53,7 +51,7 @@ dependencies:
 - text
 - transformers
 - comonad
-- simple-expr < 0.3
+- simple-expr >= 0.2 && < 0.3
 - profunctors
 - optics
 - lens
@@ -73,6 +71,11 @@ dependencies:
 - hashable
 - indexed-list-literals
 - combinatorial
+tested-with:
+- GHC == 9.4.8
+- GHC == 9.6.5
+- GHC == 9.8.2
+- GHC == 9.10.1
 ghc-options:
 - -Wall
 - -Wcompat

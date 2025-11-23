@@ -1,5 +1,8 @@
 # Revision history for simple-expr
 
+## [0.2.0.1] -- 2025-11-23
+* **Documentation fixes**
+
 ## [0.2.0.0] -- 2025-11-13
 
 ### Changed

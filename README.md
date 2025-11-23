@@ -33,17 +33,24 @@ Symbolic expression library for debugging and mathematical verification.
 ## Installation
 ```bash
 # Install from Hackage
-cabal install inf-backprop
 cabal install simple-expr
+cabal install inf-backprop
+```
 
-# Or add to your project's cabal file
-build-depends: inf-backprop, simple-expr
+Or add to your project's `*.cabal` file
+```cabal
+build-depends: simple-expr, inf-backprop 
+```
+
+Stakage users can add the packages to their `stack.yaml`
+```yaml
+dependencies: simple-expr, inf-backprop
 ```
 
 ## Documentation and Quick Start
 
-See 
-[inf-backprop tutorial](Numeric-InfBackprop-Tutorial.html) 
+See
+[inf-backprop tutorial](Numeric-InfBackprop-Tutorial.html)
 and
 [simple-expr tutorial](Debug-SimpleExpr-Tutorial.html)
 for step-by-step guides to get started with each package.

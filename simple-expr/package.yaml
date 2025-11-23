@@ -1,16 +1,14 @@
 name: simple-expr
-version: 0.2.0.0
+version: 0.2.0.1
 license: BSD3
 author: Alexey Tochin
 maintainer: Alexey.Tochin@gmail.com
-copyright: 2024 Alexey Tochin
+copyright: 2023-2025 Alexey Tochin
 extra-source-files:
 - CHANGELOG.md
 - doc/images/*.png
-- main_page_images/*.png
 extra-doc-files:
 - doc/images/*.png
-- main_page_images/*.png
 synopsis: Minimalistic toolkit for simple mathematical expression.
 category: Mathematics
 description:
@@ -32,10 +30,10 @@ description:
   \n\n
   Besides an expression visualization feature is also provided.
   \n\n
-  ![image description](docs/doc/images/imaginary_expr_sum.png)
+  ![image description](https://raw.githubusercontent.com/alexeytochin/deep-ml/refs/heads/main/simple-expr/doc/images/imaginary_expr_sum.png)
   \n\n
   See 
-  [tutorial](docs/Debug-SimpleExpr-Tutorial.html) 
+  [tutorial](https://hackage-content.haskell.org/package/simple-expr-0.2.0.1/docs/Debug-SimpleExpr-Tutorial.html) 
   for details."
 dependencies:
 - base >= 4.19 && < 5
@@ -53,6 +51,11 @@ dependencies:
 - unordered-containers
 - composition
 - combinatorial
+tested-with:
+- GHC == 9.4.8
+- GHC == 9.6.5
+- GHC == 9.8.2
+- GHC == 9.10.1
 ghc-options:
 - -Wall
 - -Wcompat
