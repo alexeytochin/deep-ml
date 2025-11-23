@@ -1,5 +1,5 @@
 name: inf-backprop
-version: 0.2.0.1
+version: 0.2.0.2
 license: BSD3
 author: Alexey Tochin
 maintainer: Alexey.Tochin@gmail.com
@@ -34,7 +34,7 @@ description:
   and implementing custom\ndifferentiable algorithms.
   \n\n
   See the 
-  [tutorial](https://hackage-content.haskell.org/package/inf-backprop-0.2.0.1/docs/Numeric-InfBackprop-Tutorial.html)
+  [tutorial](https://hackage-content.haskell.org/package/inf-backprop/docs/Numeric-InfBackprop-Tutorial.html)
   for detailed\nexamples and usage patterns.
   \n\n
   Similar Projects:

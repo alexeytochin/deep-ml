@@ -15,16 +15,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Stack
-        uses: actions/setup-haskell@v1
-        with:
-          ghc-version: "latest"
+      - name: Upgrade Stack
+        run: stack upgrade
 
-      - name: Install dependencies with Stack
-        run: stack setup && stack build --dependencies-only
+      - name: Set up Stack with LTS Snapshot
+        run: stack --resolver nightly setup
+
+      - name: Install Dependencies
+        run: stack --resolver nightly build --only-dependencies
+
+      - name: Build All Packages
+        run: stack --resolver nightly build --fast --test --no-run-benchmarks
 
       - name: Check outdated dependencies for all packages
         run: |
@@ -34,6 +38,3 @@ jobs:
           cd inf-backprop
           cabal outdated
           cd ..
-
-      - name: Build all packages
-        run: stack build

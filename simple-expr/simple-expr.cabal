@@ -1,11 +1,11 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
 name:           simple-expr
-version:        0.2.0.0
+version:        0.2.0.2
 synopsis:       Minimalistic toolkit for simple mathematical expression.
 description:    This is a minimalistic toolkit for simple mathematical expression developed for debug purposes similar to [simple-reflect](https://hackage.haskell.org/package/simple-reflect) package but based on slightly different principles. In particular, we use ordinary syntactic trees instead of turning them into strings. 
                 .
@@ -18,9 +18,9 @@ description:    This is a minimalistic toolkit for simple mathematical expressio
                 .
                  Besides an expression visualization feature is also provided. 
                 .
-                 ![image description](docs/doc/images/imaginary_expr_sum.png) 
+                 ![image description](https://raw.githubusercontent.com/alexeytochin/deep-ml/refs/heads/main/simple-expr/doc/images/imaginary_expr_sum.png) 
                 .
-                 See [tutorial](docs/Debug-SimpleExpr-Tutorial.html) for details.
+                 See [tutorial](https://hackage-content.haskell.org/package/simple-expr/docs/Debug-SimpleExpr-Tutorial.html) for details.
 category:       Mathematics
 author:         Alexey Tochin
 maintainer:     Alexey.Tochin@gmail.com
@@ -28,6 +28,9 @@ copyright:      2023-2025 Alexey Tochin
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+tested-with:
+    GHC == 9.8.4
+  , GHC == 9.10.3
 extra-source-files:
     CHANGELOG.md
     doc/images/composition.png

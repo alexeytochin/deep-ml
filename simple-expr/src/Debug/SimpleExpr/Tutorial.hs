@@ -133,4 +133,4 @@ import Prelude (FilePath, IO, String)
 --   expr = exp (i * k * x) + exp (-(i * k * x))
 -- :}
 --
--- ![image description](main_page_images/imaginary_expr_sum.png)
+-- ![image description](doc/images/imaginary_expr_sum.png)

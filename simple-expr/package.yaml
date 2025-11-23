@@ -1,5 +1,5 @@
 name: simple-expr
-version: 0.2.0.1
+version: 0.2.0.2
 license: BSD3
 author: Alexey Tochin
 maintainer: Alexey.Tochin@gmail.com
@@ -33,7 +33,7 @@ description:
   ![image description](https://raw.githubusercontent.com/alexeytochin/deep-ml/refs/heads/main/simple-expr/doc/images/imaginary_expr_sum.png)
   \n\n
   See 
-  [tutorial](https://hackage-content.haskell.org/package/simple-expr-0.2.0.1/docs/Debug-SimpleExpr-Tutorial.html) 
+  [tutorial](https://hackage-content.haskell.org/package/simple-expr/docs/Debug-SimpleExpr-Tutorial.html) 
   for details."
 dependencies:
 - base >= 4.19 && < 5
