@@ -118,7 +118,7 @@ library:
   - text < 2.2
   - extra < 1.9
   - finite-typelits < 0.3
-  - fixed-vector < 2.1
+  - fixed-vector < 2.2
   - primitive < 0.10
   - indexed-list-literals < 0.3
   - isomorphism-class < 0.4
