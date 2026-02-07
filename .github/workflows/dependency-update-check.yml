@@ -32,7 +32,6 @@ jobs:
 
       - name: Check outdated dependencies for all packages
         run: |
-          cabal update
           cd simple-expr
           cabal outdated
           cd ..
