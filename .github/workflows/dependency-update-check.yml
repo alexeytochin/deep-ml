@@ -31,10 +31,24 @@ jobs:
         run: stack --resolver nightly build --fast --test --no-run-benchmarks
 
       - name: Check outdated dependencies for all packages
+        id: outdated
         run: |
-          cd simple-expr
-          cabal outdated
-          cd ..
-          cd inf-backprop
-          cabal outdated
-          cd ..
+          status=0
+          (cd simple-expr && cabal outdated --exit-code) || status=1
+          (cd inf-backprop && cabal outdated --exit-code) || status=1
+          exit $status
+
+      - name: Notify Telegram with dependency check result
+        if: always()
+        run: |
+          case "${{ steps.outdated.outcome }}" in
+            success) msg="✅ deep-ml: dependencies up to date." ;;
+            failure) msg="⚠️ deep-ml: outdated dependencies detected." ;;
+            *)       msg="❌ deep-ml: dependency check job failed (build/setup error)." ;;
+          esac
+          curl -sS -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d disable_web_page_preview=true \
+            --data-urlencode text="$msg
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

@@ -42,3 +42,23 @@ jobs:
 
       - name: Build All Packages
         run: stack --resolver ${{ matrix.lts }} build --fast --haddock --test --bench --no-run-benchmarks
+
+  notify:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Telegram with CI result
+        run: |
+          case "${{ needs.build.result }}" in
+            success)   msg="✅ deep-ml CI: build & tests passed." ;;
+            failure)   msg="❌ deep-ml CI: build or tests failed." ;;
+            cancelled) msg="⚠️ deep-ml CI: run cancelled." ;;
+            *)         msg="⚠️ deep-ml CI: ${{ needs.build.result }}." ;;
+          esac
+          curl -sS -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d disable_web_page_preview=true \
+            --data-urlencode text="$msg
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
