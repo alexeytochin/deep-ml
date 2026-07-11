@@ -112,7 +112,7 @@ library:
   - transformers < 0.7
   - combinatorial < 0.2
   - comonad < 5.1
-  - composition < 1.1
+  - composition < 3
   - data-fix < 0.4
   - hashable < 1.6
   - text < 2.2
