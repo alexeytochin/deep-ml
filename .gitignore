@@ -1,5 +1,4 @@
-dist
-dist-*
+**dist-*
 cabal-dev
 *.o
 *.hi
@@ -23,4 +22,11 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 scripts
+.history/**/*
+.idea/**/*
+.vscode/**/*
+.zed/**/*
+*/hackage-dist/**/*
+*/.tmp*/**/*
+*/tmp*/**/*
 **/*.dev

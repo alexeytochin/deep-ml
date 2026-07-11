@@ -72,7 +72,7 @@ library
       Stream <0.5
     , base >=4.19 && <5
     , combinatorial <0.2
-    , composition <1.1
+    , composition <3
     , data-fix <0.4
     , graphite <0.11
     , graphviz <2999.21

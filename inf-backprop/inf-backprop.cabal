@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.39.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -100,12 +100,12 @@ library
     , base >=4.7 && <5
     , combinatorial <0.2
     , comonad <5.1
-    , composition <1.1
+    , composition <3
     , data-fix <0.4
     , deepseq <1.6
     , extra <1.9
     , finite-typelits <0.3
-    , fixed-vector <2.1
+    , fixed-vector <2.2
     , ghc-prim <0.14
     , hashable <1.6
     , indexed-list-literals <0.3

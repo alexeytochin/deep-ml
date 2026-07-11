@@ -33,6 +33,7 @@ jobs:
       - name: Check outdated dependencies for all packages
         id: outdated
         run: |
+          cabal update
           status=0
           (cd simple-expr && cabal outdated --exit-code) || status=1
           (cd inf-backprop && cabal outdated --exit-code) || status=1
